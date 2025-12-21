@@ -1,98 +1,145 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { View, Text, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      <StatusBar style="dark" />
+      <Text style={styles.title}>Welcome to Home</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.welcomeContainer}>
+        <View style={styles.catContainer}>
+          <View style={styles.cat}>
+            <View style={styles.catEar} />
+            <View style={styles.catEar} />
+            <View style={styles.catFace}>
+              <View style={styles.catEye} />
+              <View style={styles.catEye} />
+              <View style={styles.catNose} />
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.welcomeText}>
+          <Text style={styles.welcomeLetterDark}>W</Text>
+          <Text style={styles.welcomeLetterDark}>E</Text>
+          <Text style={styles.welcomeLetterPink}>L</Text>
+          <Text style={styles.welcomeLetterPink}>C</Text>
+          <Text style={styles.welcomeLetterPink}>O</Text>
+          <Text style={styles.welcomeLetterDark}>M</Text>
+          <Text style={styles.welcomeLetterDark}>E</Text>
+        </Text>
+
+        <View style={styles.catContainer}>
+          <View style={styles.cat}>
+            <View style={styles.catEar} />
+            <View style={styles.catEar} />
+            <View style={styles.catFace}>
+              <View style={styles.catEye} />
+              <View style={styles.catEye} />
+              <View style={styles.catNose} />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.dotsContainer}>
+        <View style={[styles.dot, styles.dotPink]} />
+        <View style={[styles.dot, styles.dotPink]} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 80,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 60,
+  },
+  welcomeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 40,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  catContainer: {
+    marginHorizontal: 12,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  cat: {
+    width: 60,
+    height: 60,
+    position: 'relative',
+  },
+  catEar: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#2D2D3D',
     position: 'absolute',
+    top: 0,
+  },
+  catFace: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#2D2D3D',
+    borderRadius: 25,
+    position: 'absolute',
+    top: 10,
+    left: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catEye: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#FF6B9D',
+    borderRadius: 3,
+    marginHorizontal: 4,
+  },
+  catNose: {
+    width: 4,
+    height: 4,
+    backgroundColor: '#FF6B9D',
+    borderRadius: 2,
+    marginTop: 4,
+  },
+  welcomeText: {
+    fontSize: 48,
+    fontWeight: '700',
+    letterSpacing: 4,
+  },
+  welcomeLetterDark: {
+    color: '#2D2D3D',
+  },
+  welcomeLetterPink: {
+    color: '#FF6B9D',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 20,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotPink: {
+    backgroundColor: '#FFB3C6',
   },
 });
