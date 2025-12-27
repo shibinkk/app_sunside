@@ -7,23 +7,31 @@ import {
     StyleSheet,
     Pressable,
     useWindowDimensions,
+    ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../constants/Config';
+
+
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams();
+    const { showToast } = useToast();
     const { height: screenHeight } = useWindowDimensions();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
 
-    const handleReset = () => {
+    const handleReset = async () => {
         const newErrors: typeof errors = {};
 
         if (!password.trim()) newErrors.password = 'Password is required';
@@ -38,9 +46,37 @@ export default function ResetPasswordScreen() {
         }
 
         setErrors({});
-        // Success logic here
-        router.replace('/(auth)/login');
+        setIsLoading(true);
+
+        try {
+            const response = await fetch(`${API_URL}/auth/verify-reset-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: params.email,
+                    otp: params.otp,
+                    newPassword: password
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('Password reset successfully!', 'success');
+                router.replace('/(auth)/login');
+            } else {
+                showToast(data.message || 'Error resetting password', 'error');
+            }
+        } catch (error) {
+            console.error('Reset Password Error:', error);
+            showToast('Could not connect to the server', 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
+
 
     const responsiveMargin = screenHeight < 700 ? 15 : 30;
 

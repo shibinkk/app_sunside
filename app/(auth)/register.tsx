@@ -16,9 +16,13 @@ import CountryPickerModal from '@/components/CountryPickerModal';
 import { Image } from 'expo-image';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/mobile';
 import countriesData from '../../constants/countries.json';
+import { API_URL } from '../../constants/Config';
+import { ActivityIndicator } from 'react-native';
+import { useToast } from '../../context/ToastContext';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { showToast } = useToast();
   const { height: screenHeight } = useWindowDimensions();
 
   const [fullName, setFullName] = useState('');
@@ -31,6 +35,7 @@ export default function RegisterScreen() {
   const [callingCode, setCallingCode] = useState('+91');
   const [countryFlag, setCountryFlag] = useState('https://flagcdn.com/w320/in.png');
   const [isCountryPickerVisible, setIsCountryPickerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     fullName?: string;
     email?: string;
@@ -39,7 +44,7 @@ export default function RegisterScreen() {
     terms?: string;
   }>({});
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const newErrors: typeof errors = {};
 
     if (!fullName.trim()) newErrors.fullName = 'Full name is required';
@@ -66,8 +71,46 @@ export default function RegisterScreen() {
     }
 
     setErrors({});
-    router.push('/(auth)/verify');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/auth/send-register-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          name: fullName
+        }),
+
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast('OTP sent to your email!', 'success');
+        router.push({
+          pathname: '/(auth)/verify',
+          params: {
+            name: fullName,
+            email: email,
+            password: password,
+            phoneNumber: `${callingCode}${phone}`,
+          }
+        });
+      } else {
+        showToast(data.message || 'An error occurred', 'error');
+      }
+    } catch (error) {
+      console.error('OTP Send Error:', error);
+      showToast('Could not connect to the server', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+
 
   const responsiveMargin = screenHeight < 700 ? 10 : 20;
   const headerMargin = screenHeight < 700 ? 15 : 30;
@@ -254,9 +297,19 @@ export default function RegisterScreen() {
 
         {/* BUTTONS */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.nextButton} onPress={handleRegister}>
-            <Text style={styles.nextButtonText}>Next</Text>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={{ marginTop: 3 }} />
+          <TouchableOpacity
+            style={[styles.nextButton, isLoading && { opacity: 0.7 }]}
+            onPress={handleRegister}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>Next</Text>
+                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={{ marginTop: 3 }} />
+              </>
+            )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>

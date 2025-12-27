@@ -14,17 +14,25 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { API_URL } from '../../constants/Config';
+import { ActivityIndicator } from 'react-native';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { showToast } = useToast();
+  const { signIn } = useAuth();
   const { height: screenHeight } = useWindowDimensions();
+
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const newErrors: { email?: string; password?: string } = {};
 
     if (!email.trim()) {
@@ -40,7 +48,36 @@ export default function LoginScreen() {
     }
 
     setErrors({});
-    router.push('/(tabs)');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        await signIn(data.token, data.user);
+        showToast('Login successful!', 'success');
+        router.replace('/(tabs)');
+      } else {
+        showToast(data.message || 'Invalid email or password', 'error');
+      }
+
+    } catch (error) {
+      console.error('Login Error:', error);
+      showToast('Could not connect to the server', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const responsiveMargin = screenHeight < 700 ? 15 : 30;
@@ -141,9 +178,19 @@ export default function LoginScreen() {
 
         {/* BUTTONS */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.nextButton} onPress={handleLogin}>
-            <Text style={styles.nextButtonText}>Next</Text>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={{ marginTop: 3 }} />
+          <TouchableOpacity
+            style={[styles.nextButton, isLoading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>Next</Text>
+                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={{ marginTop: 3 }} />
+              </>
+            )}
           </TouchableOpacity>
 
           <View style={styles.registerContainer}>

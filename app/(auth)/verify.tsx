@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,18 +7,40 @@ import {
     StyleSheet,
     Pressable,
     useWindowDimensions,
+    ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../constants/Config';
+import { useAuth } from '../../context/AuthContext';
 
 export default function VerifyScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams();
+    const { showToast } = useToast();
+    const { signIn } = useAuth();
     const { height: screenHeight } = useWindowDimensions();
-    const [code, setCode] = useState(['', '', '', '', '']);
+
+
+    const [code, setCode] = useState(['', '', '', '', '', '']); // Changed to 6 digits
+    const [isLoading, setIsLoading] = useState(false);
+    const [isResending, setIsResending] = useState(false);
+    const [timer, setTimer] = useState(30);
     const inputRefs = useRef<(TextInput | null)[]>([]);
+
+    useEffect(() => {
+        let interval: any;
+        if (timer > 0) {
+            interval = setInterval(() => {
+                setTimer((prev) => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
 
     const responsiveMargin = screenHeight < 700 ? 10 : 20;
 
@@ -28,7 +50,7 @@ export default function VerifyScreen() {
         setCode(newCode);
 
         // Auto-focus next input
-        if (text && index < 4) {
+        if (text && index < 5) { // Updated for 6 digits
             inputRefs.current[index + 1]?.focus();
         }
     };
@@ -39,9 +61,78 @@ export default function VerifyScreen() {
         }
     };
 
-    const handleVerify = () => {
-        // Add your verification logic here
-        router.replace('/(tabs)');
+    const handleVerify = async () => {
+        const otp = code.join('');
+        if (otp.length < 6) {
+            showToast('Please enter the 6-digit code', 'error');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/auth/verify-register-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: params.name,
+                    email: params.email,
+                    password: params.password,
+                    phoneNumber: params.phoneNumber,
+                    otp: otp
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                await signIn(data.token, data.user);
+                showToast('Registration successful!', 'success');
+                router.replace('/(tabs)');
+            } else {
+                showToast(data.message || 'Verification failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Verification Error:', error);
+            showToast('Could not connect to the server', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        if (timer > 0) return;
+
+        setIsResending(true);
+        try {
+            const response = await fetch(`${API_URL}/auth/send-register-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: params.email,
+                    name: params.name
+                }),
+
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('New OTP sent!', 'success');
+                setTimer(30);
+            } else {
+                showToast(data.message || 'Failed to resend OTP', 'error');
+            }
+        } catch (error) {
+            console.error('Resend Error:', error);
+            showToast('Could not connect to the server', 'error');
+        } finally {
+            setIsResending(false);
+        }
     };
 
     const handleGoBack = () => {
@@ -79,8 +170,8 @@ export default function VerifyScreen() {
                     <Text style={styles.title}>Almost there</Text>
 
                     <Text style={styles.subtitle}>
-                        Please enter the 5-digit code sent to your email{' '}
-                        <Text style={styles.email}>contact.uiuxexperts@gmail.com</Text> for verification.
+                        Please enter the 6-digit code sent to your email{' '}
+                        <Text style={styles.email}>{params.email || 'your email'}</Text> for verification.
                     </Text>
 
                     <View style={styles.codeContainer}>
@@ -99,20 +190,31 @@ export default function VerifyScreen() {
                         ))}
                     </View>
 
-                    <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-                        <Text style={styles.verifyButtonText}>Verify</Text>
+                    <TouchableOpacity
+                        style={[styles.verifyButton, isLoading && { opacity: 0.7 }]}
+                        onPress={handleVerify}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.verifyButtonText}>Verify</Text>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.resendContainer}>
                         <Text style={styles.resendText}>Didn't receive any code? </Text>
-                        <TouchableOpacity>
-                            <Text style={styles.resendLink}>Resend Again</Text>
+                        <TouchableOpacity onPress={handleResend} disabled={timer > 0 || isResending}>
+                            <Text style={[styles.resendLink, (timer > 0 || isResending) && { color: '#CCC' }]}>
+                                {isResending ? 'Resending...' : 'Resend Again'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.timerText}>Request a new code in 00:30s</Text>
+                    {timer > 0 && <Text style={styles.timerText}>Request a new code in 00:{timer < 10 ? `0${timer}` : timer}s</Text>}
                 </View>
             </KeyboardAwareScrollView>
+
 
             <TouchableOpacity style={styles.backButtonCircle} onPress={handleGoBack}>
                 <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
@@ -159,21 +261,23 @@ const styles = StyleSheet.create({
     },
     codeContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
+        gap: 8,
         marginBottom: 40,
     },
     codeInput: {
-        width: 56,
-        height: 56,
+        width: 48,
+        height: 52,
         backgroundColor: 'transparent',
         borderRadius: 12,
         borderWidth: 1.5,
         borderColor: '#000000',
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '600',
         textAlign: 'center',
         color: '#1a1a1a',
     },
+
     verifyButton: {
         backgroundColor: '#000000',
         borderRadius: 12,

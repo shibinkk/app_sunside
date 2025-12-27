@@ -12,14 +12,19 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { API_URL } from '../../constants/Config';
+import { ActivityIndicator } from 'react-native';
+import { useToast } from '../../context/ToastContext';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
+    const { showToast } = useToast();
     const { height: screenHeight } = useWindowDimensions();
     const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ email?: string }>({});
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (!email.trim()) {
             setErrors({ email: 'Email is required' });
             return;
@@ -29,8 +34,36 @@ export default function ForgotPasswordScreen() {
             return;
         }
         setErrors({});
-        router.push('/(auth)/forgot-verification');
+        setIsLoading(true);
+
+        try {
+            const response = await fetch(`${API_URL}/auth/send-reset-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast(data.message, 'success');
+                router.push({
+                    pathname: '/(auth)/forgot-verification',
+                    params: { email }
+                });
+            } else {
+                showToast(data.message || 'An error occurred', 'error');
+            }
+        } catch (error) {
+            console.error('Forgot Password Error:', error);
+            showToast('Could not connect to the server', 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
+
 
     const responsiveMargin = screenHeight < 700 ? 15 : 30;
 
@@ -91,9 +124,19 @@ export default function ForgotPasswordScreen() {
                     </View>
                     {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
-                    <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                        <Text style={styles.nextButtonText}>Next</Text>
-                        <Ionicons name="chevron-forward" size={20} color="#FFF" style={{ marginLeft: 4 }} />
+                    <TouchableOpacity
+                        style={[styles.nextButton, isLoading && { opacity: 0.7 }]}
+                        onPress={handleNext}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <>
+                                <Text style={styles.nextButtonText}>Next</Text>
+                                <Ionicons name="chevron-forward" size={20} color="#FFF" style={{ marginLeft: 4 }} />
+                            </>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.footer}>

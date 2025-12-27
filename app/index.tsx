@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '../context/AuthContext';
 
 export default function SplashScreen() {
     const router = useRouter();
+    const { token, isLoading } = useAuth();
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -15,13 +17,20 @@ export default function SplashScreen() {
             useNativeDriver: true,
         }).start();
 
-        // Navigate to login after 2.5 seconds
-        const timer = setTimeout(() => {
-            router.replace('/(auth)/login');
-        }, 2500);
+        // Navigate after 2 seconds, but only if auth has finished loading
+        if (!isLoading) {
+            const timer = setTimeout(() => {
+                if (token) {
+                    router.replace('/(tabs)');
+                } else {
+                    router.replace('/(auth)/login');
+                }
+            }, 2000);
 
-        return () => clearTimeout(timer);
-    }, []);
+            return () => clearTimeout(timer);
+        }
+    }, [isLoading, token]);
+
 
     return (
         <View style={styles.container}>
