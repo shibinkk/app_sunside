@@ -253,21 +253,23 @@ const styles = StyleSheet.create({
     },
     codeContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
+        gap: 8,
         marginBottom: 40,
     },
     codeInput: {
-        width: 56,
-        height: 56,
+        width: 48,
+        height: 52,
         backgroundColor: 'transparent',
         borderRadius: 12,
         borderWidth: 1.5,
         borderColor: '#000000',
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '600',
         textAlign: 'center',
         color: '#1a1a1a',
     },
+
     verifyButton: {
         backgroundColor: '#000000',
         borderRadius: 12,
