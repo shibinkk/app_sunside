@@ -1,51 +1,162 @@
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform } from 'react-native';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+
+const { width, height } = Dimensions.get('window');
+
+// Custom Uber-like Silver/Grey theme
+const mapStyle = [
+  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
+];
 
 export default function HomeScreen() {
+  const [location, setLocation] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const mapRef = useRef<MapView>(null);
+
+  const getLocation = async () => {
+    try {
+      // 1. Check if location services are enabled
+      let enabled = await Location.hasServicesEnabledAsync();
+
+      if (!enabled) {
+        Alert.alert(
+          'Location Services Disabled',
+          'For a better experience, please turn on device location and accuracy.',
+          [
+            { text: 'No, thanks', style: 'cancel' },
+            {
+              text: 'Turn on',
+              onPress: async () => {
+                if (Platform.OS === 'android') {
+                  // This often triggers the system accuracy dialog
+                  try {
+                    await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                  } catch (e) {
+                    Linking.openSettings();
+                  }
+                } else {
+                  Linking.openSettings();
+                }
+              }
+            },
+          ]
+        );
+        return;
+      }
+
+      // 2. Request permissions
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        Alert.alert(
+          'Permission Denied',
+          'We need location permission to show your position on the map.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+
+      // 3. Get current position
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      setLocation(location);
+
+      // Animate to current location
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error('Error getting location:', error);
+      setErrorMsg('Error getting location: ' + error.message);
+
+      if (error.message.includes('unsatisfied device settings')) {
+        Alert.alert(
+          'Location Error',
+          'Location request failed. Please ensure GPS is turned on and try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
+  useEffect(() => {
+    getLocation();
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <Text style={styles.title}>Welcome to Home</Text>
 
-      <View style={styles.welcomeContainer}>
-        <View style={styles.catContainer}>
-          <View style={styles.cat}>
-            <View style={styles.catEar} />
-            <View style={styles.catEar} />
-            <View style={styles.catFace}>
-              <View style={styles.catEye} />
-              <View style={styles.catEye} />
-              <View style={styles.catNose} />
-            </View>
-          </View>
-        </View>
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        customMapStyle={mapStyle}
+        initialRegion={{
+          latitude: 37.78825,
+          longitude: -122.4324,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
+        showsUserLocation
+        showsMyLocationButton={false}
+      />
 
-        <Text style={styles.welcomeText}>
-          <Text style={styles.welcomeLetterDark}>W</Text>
-          <Text style={styles.welcomeLetterDark}>E</Text>
-          <Text style={styles.welcomeLetterPink}>L</Text>
-          <Text style={styles.welcomeLetterPink}>C</Text>
-          <Text style={styles.welcomeLetterPink}>O</Text>
-          <Text style={styles.welcomeLetterDark}>M</Text>
-          <Text style={styles.welcomeLetterDark}>E</Text>
-        </Text>
-
-        <View style={styles.catContainer}>
-          <View style={styles.cat}>
-            <View style={styles.catEar} />
-            <View style={styles.catEar} />
-            <View style={styles.catFace}>
-              <View style={styles.catEye} />
-              <View style={styles.catEye} />
-              <View style={styles.catNose} />
-            </View>
-          </View>
+      {/* Header Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <TouchableOpacity style={styles.searchIcon}>
+            <Ionicons name="location-outline" size={24} color="#000" />
+          </TouchableOpacity>
+          <TextInput
+            placeholder="Search here"
+            placeholderTextColor="#999"
+            style={styles.searchInput}
+          />
+          <TouchableOpacity style={styles.voiceButton}>
+            <MaterialIcons name="mic-none" size={24} color="#FFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.dotsContainer}>
-        <View style={[styles.dot, styles.dotPink]} />
-        <View style={[styles.dot, styles.dotPink]} />
+      {/* Floating Buttons */}
+      <View style={styles.floatingButtons}>
+        <TouchableOpacity style={styles.floatingButton} onPress={getLocation}>
+          <Ionicons name="locate" size={24} color="#000" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.floatingButton}>
+          <Ionicons name="cloud-outline" size={24} color="#000" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -55,91 +166,64 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
-    paddingTop: 80,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 60,
+  map: {
+    width: '100%',
+    height: '100%',
   },
-  welcomeContainer: {
+  searchContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    zIndex: 1,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
-  },
-  catContainer: {
-    marginHorizontal: 12,
-  },
-  cat: {
-    width: 60,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
     height: 60,
-    position: 'relative',
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  catEar: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderBottomWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#2D2D3D',
-    position: 'absolute',
-    top: 0,
+  searchIcon: {
+    marginRight: 10,
   },
-  catFace: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#2D2D3D',
-    borderRadius: 25,
-    position: 'absolute',
-    top: 10,
-    left: 5,
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#000',
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  floatingButtons: {
+    position: 'absolute',
+    bottom: 120, // Space for Bottom Tab Bar
+    right: 20,
+    gap: 15,
+  },
+  floatingButton: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
     justifyContent: 'center',
-  },
-  catEye: {
-    width: 6,
-    height: 6,
-    backgroundColor: '#FF6B9D',
-    borderRadius: 3,
-    marginHorizontal: 4,
-  },
-  catNose: {
-    width: 4,
-    height: 4,
-    backgroundColor: '#FF6B9D',
-    borderRadius: 2,
-    marginTop: 4,
-  },
-  welcomeText: {
-    fontSize: 48,
-    fontWeight: '700',
-    letterSpacing: 4,
-  },
-  welcomeLetterDark: {
-    color: '#2D2D3D',
-  },
-  welcomeLetterPink: {
-    color: '#FF6B9D',
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginTop: 20,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  dotPink: {
-    backgroundColor: '#FFB3C6',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
 });
