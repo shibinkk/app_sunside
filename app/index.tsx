@@ -21,8 +21,14 @@ export default function SplashScreen() {
             // Request Microphone
             await Audio.requestPermissionsAsync();
 
-            // Request Notifications
-            await Notifications.requestPermissionsAsync();
+            // Request Notifications - Handle Expo Go SDK 53+ limitations gracefully
+            try {
+                if (Notifications && typeof Notifications.requestPermissionsAsync === 'function') {
+                    await Notifications.requestPermissionsAsync();
+                }
+            } catch (notifyError) {
+                console.warn('Notifications permission skip (likely Expo Go):', notifyError);
+            }
         } catch (error) {
             console.error('Error requesting permissions:', error);
         }
