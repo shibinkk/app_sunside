@@ -3,21 +3,26 @@ import Toast, { ToastType } from '../components/Toast';
 
 
 interface ToastContextType {
-    showToast: (message: string, type: ToastType) => void;
+    showToast: (message: string, type: ToastType, title?: string) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-    const [toast, setToast] = useState<{ message: string; type: ToastType; visible: boolean }>({
+    const [toast, setToast] = useState<{
+        message: string;
+        type: ToastType;
+        visible: boolean;
+        title?: string;
+    }>({
         message: '',
         type: 'success',
         visible: false,
     });
 
 
-    const showToast = useCallback((message: string, type: ToastType) => {
-        setToast({ message, type, visible: true });
+    const showToast = useCallback((message: string, type: ToastType, title?: string) => {
+        setToast({ message, type, visible: true, title });
     }, []);
 
     const hideToast = useCallback(() => {
@@ -28,6 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <ToastContext.Provider value={{ showToast }}>
             {children}
             <Toast
+                title={toast.title}
                 message={toast.message}
                 type={toast.type}
                 visible={toast.visible}

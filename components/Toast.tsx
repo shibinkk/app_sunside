@@ -12,25 +12,26 @@ import { Ionicons } from '@expo/vector-icons';
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastProps {
+    title?: string;
     message: string;
     type: ToastType;
     visible: boolean;
     onHide: () => void;
 }
 
-const Toast = ({ message, type, visible, onHide }: ToastProps) => {
+const Toast = ({ title, message, type, visible, onHide }: ToastProps) => {
     const { width } = useWindowDimensions();
     const translateY = useSharedValue(-150);
     const opacity = useSharedValue(0);
 
     useEffect(() => {
         if (visible) {
-            translateY.value = withSpring(60, { damping: 12, stiffness: 120 });
-            opacity.value = withTiming(1, { duration: 150 });
+            translateY.value = withSpring(60, { damping: 15, stiffness: 120 });
+            opacity.value = withTiming(1, { duration: 200 });
 
             const timer = setTimeout(() => {
                 hide();
-            }, 2500);
+            }, 3500);
 
             return () => clearTimeout(timer);
         }
@@ -54,27 +55,27 @@ const Toast = ({ message, type, visible, onHide }: ToastProps) => {
         switch (type) {
             case 'success':
                 return {
-                    color: '#4CAF50',
-                    icon: 'checkmark',
-                    title: 'Success'
+                    color: '#00D084',
+                    icon: 'checkmark-circle',
+                    title: 'Saved Successfully'
                 };
             case 'error':
                 return {
                     color: '#FF4B5C',
-                    icon: 'close',
-                    title: 'Error'
+                    icon: 'close-circle',
+                    title: 'Error Occurred'
                 };
             case 'info':
                 return {
                     color: '#2196F3',
-                    icon: 'information',
-                    title: 'Info'
+                    icon: 'information-circle',
+                    title: 'Information'
                 };
             case 'warning':
                 return {
-                    color: '#FFB74D',
-                    icon: 'alert',
-                    title: 'Warning'
+                    color: '#FFB100',
+                    icon: 'alert-circle',
+                    title: 'Action Required'
                 };
 
             default:
@@ -92,24 +93,21 @@ const Toast = ({ message, type, visible, onHide }: ToastProps) => {
 
     return (
         <Animated.View style={[styles.container, { width: width - 32 }, animatedStyle]}>
-            <View style={[styles.sideStripe, { backgroundColor: config.color }]} />
-
             <View style={styles.contentContainer}>
-                <View style={[styles.iconContainer, { backgroundColor: config.color }]}>
-                    <Ionicons name={config.icon as any} size={20} color="#FFF" />
+                <View style={[styles.iconContainer, { backgroundColor: `${config.color}33` }]}>
+                    <Ionicons name={config.icon as any} size={24} color={config.color} />
                 </View>
 
                 <View style={styles.textContainer}>
-                    <Text style={styles.title}>{config.title}</Text>
-                    <Text style={styles.message} numberOfLines={2}>
+                    <Text style={styles.title}>{title || config.title}</Text>
+                    <Text style={styles.message}>
                         {message}
                     </Text>
                 </View>
-
-                <TouchableOpacity onPress={hide} style={styles.closeButton}>
-                    <Ionicons name="close" size={20} color="#999" />
-                </TouchableOpacity>
             </View>
+
+            {/* Glow / Bottom border effect */}
+            <View style={[styles.bottomGlow, { backgroundColor: config.color, shadowColor: config.color }]} />
         </Animated.View>
     );
 };
@@ -121,53 +119,54 @@ const styles = StyleSheet.create({
         left: 16,
         right: 16,
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        flexDirection: 'row',
+        borderRadius: 16,
         zIndex: 9999,
         elevation: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
+        shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.15,
-        shadowRadius: 10,
+        shadowRadius: 18,
         overflow: 'hidden',
-    },
-    sideStripe: {
-        width: 6,
-        height: '100%',
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
     },
     contentContainer: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        paddingLeft: 12,
+        padding: 20,
     },
     iconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
     textContainer: {
         flex: 1,
         justifyContent: 'center',
     },
     title: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        color: '#1A1A1A',
-        marginBottom: 2,
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1A1C1E',
+        marginBottom: 4,
+        letterSpacing: 0.2,
     },
     message: {
-        color: '#666',
-        fontSize: 13,
-        lineHeight: 18,
+        color: '#64748B',
+        fontSize: 14,
+        lineHeight: 20,
+        fontWeight: '500',
     },
-    closeButton: {
-        padding: 4,
-        marginLeft: 8,
+    bottomGlow: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 4,
+        opacity: 0.9,
     },
 });
 
