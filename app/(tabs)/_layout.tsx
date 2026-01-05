@@ -8,7 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const ACTIVE_COLOR = '#FF385C';
+const ACTIVE_COLOR = '#000000ff';
 const INACTIVE_COLOR = '#757575';
 
 export default function TabLayout() {
