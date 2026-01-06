@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform } from 'react-native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView } from 'react-native';
+import MapView, { PROVIDER_GOOGLE, Polyline, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,6 +33,11 @@ const mapStyle = [
 export default function HomeScreen() {
   const [location, setLocation] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [destination, setDestination] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [heading, setHeading] = useState(0);
   const mapRef = useRef<MapView>(null);
 
   const getLocation = async () => {
@@ -110,6 +115,81 @@ export default function HomeScreen() {
     }
   };
 
+  const getRoute = async (destCoords: { latitude: number, longitude: number }) => {
+    if (!location) return;
+
+    try {
+      const startLoc = `${location.coords.longitude},${location.coords.latitude}`;
+      const endLoc = `${destCoords.longitude},${destCoords.latitude}`;
+
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${startLoc};${endLoc}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map((coord: any) => ({
+          latitude: coord[1],
+          longitude: coord[0],
+        }));
+        setRouteCoordinates(coords);
+        setDestination(destCoords);
+
+        // Fit map to show the whole route
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+          animated: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching route:', error);
+    }
+  };
+
+  const searchPlaces = async (query: string) => {
+    setSearchQuery(query);
+    if (query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+      const data = await response.json();
+      setSuggestions(data.features || []);
+    } catch (error) {
+      console.error('Error searching places:', error);
+    }
+  };
+
+  const handleSelectPlace = (feature: any) => {
+    const [lon, lat] = feature.geometry.coordinates;
+    const destCoords = { latitude: lat, longitude: lon };
+
+    setSuggestions([]);
+    setSearchQuery(feature.properties.name || feature.properties.city || 'Selected Place');
+
+    // Set destination marker only
+    setDestination(destCoords);
+    setRouteCoordinates([]); // Clear any existing routes
+
+    // Animate to found place
+    mapRef.current?.animateToRegion({
+      ...destCoords,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    }, 1000);
+  };
+
+  const resetOrientation = () => {
+    if (mapRef.current) {
+      mapRef.current.animateCamera({
+        heading: 0,
+        pitch: 0,
+      }, { duration: 1000 });
+    }
+  };
+
   useEffect(() => {
     getLocation();
   }, []);
@@ -131,7 +211,24 @@ export default function HomeScreen() {
         }}
         showsUserLocation
         showsMyLocationButton={false}
-      />
+        onRegionChangeComplete={async () => {
+          if (mapRef.current) {
+            const camera = await mapRef.current.getCamera();
+            setHeading(camera.heading || 0);
+          }
+        }}
+      >
+        {routeCoordinates.length > 0 && (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="#000"
+            strokeWidth={4}
+          />
+        )}
+        {destination && (
+          <Marker coordinate={destination} title="Destination" />
+        )}
+      </MapView>
 
       {/* Header Search Bar */}
       <View style={styles.searchContainer}>
@@ -147,15 +244,71 @@ export default function HomeScreen() {
             placeholder="Search here"
             placeholderTextColor="#999"
             style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={searchPlaces}
           />
           <TouchableOpacity style={styles.voiceButton}>
             <MaterialIcons name="mic-none" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
+
+        {suggestions.length > 0 && (
+          <View style={styles.suggestionsContainer}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {suggestions.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.suggestionItem,
+                    index === suggestions.length - 1 && { borderBottomWidth: 0 }
+                  ]}
+                  onPress={() => handleSelectPlace(item)}
+                >
+                  <Ionicons name="location-sharp" size={20} color="#666" style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.suggestionTitle} numberOfLines={1}>
+                      {item.properties.name || item.properties.city || item.properties.street}
+                    </Text>
+                    <Text style={styles.suggestionSubtitle} numberOfLines={1}>
+                      {[item.properties.city, item.properties.state, item.properties.country]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Floating Buttons */}
       <View style={styles.floatingButtons}>
+        <TouchableOpacity style={styles.floatingButton} onPress={resetOrientation}>
+          <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width="44" height="44" viewBox="0 0 100 100">
+              {/* Outer Dial Circle */}
+              <Circle cx="50" cy="50" r="45" stroke="#000" strokeWidth="2" fill="none" />
+              <Circle cx="50" cy="50" r="40" stroke="#F0F0F0" strokeWidth="1" fill="none" />
+
+              {/* Cardinal Points */}
+              <SvgText x="50" y="18" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">N</SvgText>
+              <SvgText x="50" y="90" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">S</SvgText>
+              <SvgText x="85" y="55" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">E</SvgText>
+              <SvgText x="15" y="55" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">W</SvgText>
+
+              {/* Rotating Needle Group */}
+              <G transform={`rotate(${-heading}, 50, 50)`}>
+                {/* Top Needle (Red) */}
+                <Path d="M50 20 L60 50 L40 50 Z" fill="#FF0000" />
+                {/* Bottom Needle (Black) */}
+                <Path d="M50 80 L60 50 L40 50 Z" fill="#000000" />
+                {/* Center Pivot */}
+                <Circle cx="50" cy="50" r="5" fill="#FFF" stroke="#000" strokeWidth="1" />
+              </G>
+            </Svg>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.floatingButton} onPress={getLocation}>
           <Ionicons name="locate" size={24} color="#000" />
         </TouchableOpacity>
@@ -195,6 +348,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 5,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginTop: 10,
+    padding: 10,
+    maxHeight: 250,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  suggestionTitle: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+  },
+  suggestionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
   },
   searchIcon: {
     marginRight: 10,
