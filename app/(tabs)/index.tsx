@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView, Animated, Keyboard } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Polyline, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +7,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
+const AnimatedG = Animated.createAnimatedComponent(G);
 
 // Custom Uber-like Silver/Grey theme
 const mapStyle = [
@@ -37,10 +38,26 @@ export default function HomeScreen() {
   const [destination, setDestination] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [heading, setHeading] = useState(0);
+  const animatedHeading = useRef(new Animated.Value(0)).current;
+  const locateScale = useRef(new Animated.Value(1)).current;
+  const weatherScale = useRef(new Animated.Value(1)).current;
   const mapRef = useRef<MapView>(null);
 
   const getLocation = async () => {
+    // Trigger animation
+    Animated.sequence([
+      Animated.timing(locateScale, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(locateScale, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     try {
       // 1. Check if location services are enabled
       let enabled = await Location.hasServicesEnabledAsync();
@@ -179,6 +196,41 @@ export default function HomeScreen() {
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     }, 1000);
+
+    // Hide keyboard
+    Keyboard.dismiss();
+  };
+
+  const handleWeatherPress = () => {
+    Animated.sequence([
+      Animated.timing(weatherScale, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(weatherScale, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Optional: Add weather logic here later
+    Alert.alert("Weather", "Checking daily forecast...");
+  };
+
+  const updateHeading = async () => {
+    if (mapRef.current) {
+      const camera = await mapRef.current.getCamera();
+      const newHeading = camera.heading || 0;
+
+      Animated.spring(animatedHeading, {
+        toValue: -newHeading,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 40,
+      }).start();
+    }
   };
 
   const resetOrientation = () => {
@@ -211,12 +263,8 @@ export default function HomeScreen() {
         }}
         showsUserLocation
         showsMyLocationButton={false}
-        onRegionChangeComplete={async () => {
-          if (mapRef.current) {
-            const camera = await mapRef.current.getCamera();
-            setHeading(camera.heading || 0);
-          }
-        }}
+        showsCompass={false}
+        onRegionChange={updateHeading}
       >
         {routeCoordinates.length > 0 && (
           <Polyline
@@ -286,34 +334,70 @@ export default function HomeScreen() {
       <View style={styles.floatingButtons}>
         <TouchableOpacity style={styles.floatingButton} onPress={resetOrientation}>
           <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <Svg width="44" height="44" viewBox="0 0 100 100">
-              {/* Outer Dial Circle */}
+            {/* Background Dial */}
+            <Svg width="44" height="44" viewBox="0 0 100 100" pointerEvents="none">
               <Circle cx="50" cy="50" r="45" stroke="#000" strokeWidth="2" fill="none" />
               <Circle cx="50" cy="50" r="40" stroke="#F0F0F0" strokeWidth="1" fill="none" />
-
-              {/* Cardinal Points */}
               <SvgText x="50" y="18" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">N</SvgText>
               <SvgText x="50" y="90" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">S</SvgText>
               <SvgText x="85" y="55" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">E</SvgText>
               <SvgText x="15" y="55" fill="#000" fontSize="12" fontWeight="bold" textAnchor="middle">W</SvgText>
-
-              {/* Rotating Needle Group */}
-              <G transform={`rotate(${-heading}, 50, 50)`}>
-                {/* Top Needle (Red) */}
-                <Path d="M50 20 L60 50 L40 50 Z" fill="#FF0000" />
-                {/* Bottom Needle (Black) */}
-                <Path d="M50 80 L60 50 L40 50 Z" fill="#000000" />
-                {/* Center Pivot */}
-                <Circle cx="50" cy="50" r="5" fill="#FFF" stroke="#000" strokeWidth="1" />
-              </G>
             </Svg>
+
+            {/* Rotating Needle */}
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{
+                  rotate: animatedHeading.interpolate({
+                    inputRange: [-360, 360],
+                    outputRange: ['-360deg', '360deg']
+                  })
+                }]
+              }}
+            >
+              <Svg width="44" height="44" viewBox="0 0 100 100">
+                <Path d="M50 20 L60 50 L40 50 Z" fill="#FF0000" />
+                <Path d="M50 80 L60 50 L40 50 Z" fill="#000000" />
+                <Circle cx="50" cy="50" r="5" fill="#FFF" stroke="#000" strokeWidth="1" />
+              </Svg>
+            </Animated.View>
           </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.floatingButton} onPress={getLocation}>
-          <Ionicons name="locate" size={24} color="#000" />
+          <Animated.View style={{ transform: [{ scale: locateScale }] }}>
+            <Svg width="30" height="30" viewBox="0 0 24 24">
+              {/* Outer Ring */}
+              <Circle cx="12" cy="12" r="8" stroke="#000" strokeWidth="1.5" fill="none" />
+
+              {/* Crosshairs */}
+              <Path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+
+              {/* Red Center Stroke Circle */}
+              <Circle cx="12" cy="12" r="3.5" stroke="#FF0000" strokeWidth="1.5" fill="none" />
+            </Svg>
+          </Animated.View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.floatingButton}>
-          <Ionicons name="cloud-outline" size={24} color="#000" />
+        <TouchableOpacity style={styles.floatingButton} onPress={handleWeatherPress}>
+          <Animated.View style={{ transform: [{ scale: weatherScale }] }}>
+            <Svg width="32" height="32" viewBox="418 21 700 700">
+              <Path d="M951.67623,202.67175c18.92595,22.92704 27.906,52.46677 24.94001,82.04813c-2.93042,30.60986 -18.01756,56.77238 -41.57581,76.16102c-1.91258,-2.04856 -3.72937,-4.46841 -5.80337,-6.65869c-6.55308,-6.95804 -14.02551,-12.98878 -22.20934,-17.92562c-11.407,-6.85215 -24.03161,-11.43273 -37.17607,-13.48922c-5.47503,-0.80853 -10.00062,-0.99268 -15.50577,-1.33032c-1.96456,-5.52675 -3.06995,-9.10974 -5.52154,-14.68876c-13.53301,-30.81699 -36.24305,-56.70809 -65.03283,-74.14119c-4.80469,-2.89265 -12.44127,-7.11372 -17.61533,-9.1278c20.08334,-37.349 52.51494,-58.71094 94.98274,-61.23779c5.39296,-0.12943 10.13743,-0.06539 15.53584,0.44764c29.27681,2.92276 56.21968,17.2755 74.98147,39.9426z" fill="#f90d0d" />
+              <Path d="M607.80038,586.60892h29.97563l17.50918,-0.00273c6.46471,0.00547 14.33087,-0.75244 19.5777,3.63635c3.13372,2.64038 5.07146,6.42995 5.37572,10.51776c0.7445,9.79542 -6.33392,15.87514 -15.56705,16.62485c-15.99143,0.30097 -33.00071,0.04104 -49.07504,0.04104h-15.43682c-6.67511,-0.00273 -13.13599,0.85915 -18.60829,-3.58982c-3.16792,-2.54188 -5.16312,-6.26305 -5.52511,-10.30709c-0.38798,-4.32586 1.02715,-8.61888 3.91132,-11.86394c3.46589,-3.87439 7.23794,-4.66239 12.08394,-5.01262c5.00797,-0.17784 10.68877,-0.0438 15.77883,-0.0438z" fill="#000000" />
+              <Path d="M666.42077,532.81349c6.8661,0.43232 16.08884,-0.79895 22.77325,0.52807c2.03926,0.41043 3.97288,1.23127 5.68162,2.41875c3.38844,2.31751 5.65726,5.94566 6.26141,10.0061c0.63971,4.05771 -0.36937,8.20025 -2.80236,11.50552c-2.69374,3.6254 -6.18371,5.51882 -10.61682,6.22747c-4.63942,0.22984 -24.82618,0.46241 -28.53586,-0.29277c-2.13803,-0.42957 -4.16113,-1.30789 -5.93662,-2.57472c-3.40843,-2.4297 -5.5035,-5.9265 -6.1142,-10.0745c-0.58444,-4.2 0.53847,-8.45744 3.11702,-11.82291c2.86529,-3.76221 6.40479,-5.20963 10.91067,-5.73224c1.52759,-0.1368 3.74278,-0.28453 5.26189,-0.18877z" fill="#000000" />
+              <Path d="M998.04301,149.62789c1.08899,3.18242 1.05068,7.14736 -0.53354,10.16643c-2.00834,3.82514 -21.21884,23.07587 -24.95916,25.72557c-1.75661,1.24358 -3.60624,1.82036 -5.63647,2.43764c-3.30254,0.32697 -6.61601,-0.48156 -9.39593,-2.29235c-2.99608,-1.97057 -5.0783,-5.05969 -5.77875,-8.57674c-0.62383,-3.11374 -0.05473,-7.79229 2.28468,-10.46604c7.11673,-8.13485 16.14602,-17.29794 24.42289,-24.25762c1.04521,-0.88076 3.87712,-1.48655 5.16586,-1.71118c2.6267,-0.13572 4.76909,0.03857 7.2371,1.13522c3.38189,1.50022 5.98942,4.34034 7.19332,7.83907z" fill="#f90d0d" />
+              <Path d="M752.6366,142.20117c5.80311,4.99702 25.08339,22.04872 26.89745,28.43298c1.01512,3.53894 0.53901,7.33835 -1.31609,10.51831c-2.41603,4.11873 -5.68026,5.66849 -10.00884,6.83709c-3.29979,0.11629 -6.40806,-0.29442 -9.09771,-2.39113c-4.40547,-3.63525 -8.91165,-8.05523 -12.83391,-12.22648c-4.35294,-4.62984 -12.31677,-10.63049 -13.3286,-16.99368c-0.60661,-3.70804 0.32232,-7.50334 2.57254,-10.51229c2.44913,-3.27024 5.38666,-4.64571 9.28732,-5.23645c2.15882,-0.05008 6.3473,0.2966 7.82784,1.57165z" fill="#f90d0d" />
+              <Path d="M988.15457,376.75987c3.31621,2.75256 9.2646,8.98278 10.30161,13.09249c0.8701,3.58162 0.2271,7.36572 -1.7785,10.46031c-2.26828,3.48585 -5.26983,5.2753 -9.21535,6.17276c-2.74436,0.60196 -6.03321,-0.07662 -8.47933,-1.40364c-3.37914,-1.83323 -21.59371,-20.1244 -24.45845,-23.77714c-1.2176,-1.5514 -2.19713,-3.18761 -2.68963,-5.11661c-0.88377,-3.61718 -0.25721,-7.43959 1.73746,-10.58617c2.18071,-3.46889 4.95791,-5.1497 8.82136,-6.05701c11.64232,-1.6354 17.73571,10.54974 25.76083,17.21501z" fill="#f90d0d" />
+              <Path d="M1024.70681,259.9306c3.37367,-0.00519 9.47255,-0.171 12.54798,0.50864c2.10684,0.44982 4.08234,1.38038 5.77055,2.71918c2.77173,2.25952 4.53654,5.52375 4.90591,9.07991c0.59374,5.51635 -2.71972,11.05323 -7.5682,13.49442c-2.19166,1.10403 -3.83335,1.21786 -6.19191,1.41869c-5.39296,0.13325 -11.03216,0.04625 -16.46068,0.07716c-4.6323,-0.13736 -9.56832,0.3992 -14.12128,-0.50317c-5.71582,-1.13167 -9.98695,-5.86932 -10.5588,-11.58513c-0.38854,-3.80078 0.79622,-7.59528 3.28065,-10.49862c3.08637,-3.59038 6.44637,-4.36389 10.84885,-4.67115z" fill="#f90d0d" />
+              <Path d="M656.53287,249.0711c31.1943,-12.20461 65.96776,-11.46693 96.61622,2.04992c32.22392,14.33332 57.42113,40.8956 70.03752,73.82873c3.74579,9.72265 6.35882,19.84421 7.79257,30.16469c5.89366,-1.30296 10.47125,-2.36322 16.51541,-2.86721c15.97365,-1.19049 31.90625,2.80619 45.42831,11.39606c16.20622,10.312 27.62417,26.67144 31.71471,45.44144c9.31933,43.25034 -21.66758,86.43773 -64.02592,95.43966c-8.44102,1.79217 -19.36647,2.01382 -28.10573,2.39413l-25.7335,1.22307c-58.3402,2.60481 -116.75948,2.91673 -175.12348,0.93577l-31.61758,-1.19843c-9.03805,-0.32014 -22.72839,-0.70865 -31.36832,-2.1342c-13.01586,-2.14515 -25.41938,-7.05927 -36.37274,-14.4113c-20.83981,-13.8504 -36.68097,-36.56319 -41.99216,-61.19948c-0.42636,-1.97823 -1.64157,-10.34812 -2.29818,-11.39059v-18.4827c1.19124,-2.75531 1.34674,-6.88141 2.02344,-9.88846c0.67868,-3.01524 1.43532,-5.85262 2.40179,-8.78852c7.70207,-23.21788 24.70957,-42.1898 46.95147,-52.37429c14.147,-6.46114 28.2866,-8.82354 43.75461,-8.02321c14.52076,-33.15229 39.44977,-58.84995 73.40156,-72.11508z" fill="#000000" />
+              <Path d="M823.32341,651.38182l-0.51167,-0.19153c-1.52404,-0.54996 -4.15074,-1.04795 -5.73224,-1.37354c-18.0586,-3.69928 -34.0979,-17.12557 -41.22011,-34.0897c-1.45017,-3.45576 -2.82371,-6.97718 -2.49263,-10.8461c0.39126,-5.37654 3.70748,-10.40285 8.63255,-12.63827c3.78683,-1.7101 8.09626,-1.8469 11.9816,-0.37759c8.94721,3.40925 8.18383,10.1347 12.81613,16.69872c13.1308,18.60856 41.62232,14.92297 49.98673,-6.09889c2.71427,-6.78292 2.45432,-15.30329 -0.53354,-21.94941c-3.16572,-7.07022 -9.0594,-12.5562 -16.3403,-15.20479c-7.18513,-2.6185 -28.60372,-1.67999 -37.43601,-1.67999l-56.12229,0.01095c-6.13718,0 -16.09293,0.71413 -22.00468,-0.61563c-13.55873,-3.05081 -15.24912,-23.10405 -2.63901,-28.63654c5.69912,-2.50085 18.3976,-1.5596 25.26069,-1.55413l34.1633,-0.00547l32.35771,-0.01095c13.05143,-0.0082 24.63357,-0.79347 37.12409,4.05223c14.80804,5.68026 26.71851,17.06812 33.05544,31.60802c6.25211,14.39216 6.55035,30.67498 0.82906,45.28603c-5.88546,14.85457 -17.47033,26.7404 -32.16893,33.00346c-2.56103,1.11088 -4.54748,1.81954 -7.21522,2.53094c-2.10684,0.56091 -6.78839,1.22852 -8.55048,2.08222z" fill="#000000" />
+              <Path d="M866.0183,91.01819c10.59984,2.62715 13.98447,7.46066 13.34967,18.60319c-0.44052,7.70371 0.63205,16.54074 -0.13955,24.13959c-0.14502,1.56343 -0.52261,3.09649 -1.1273,4.54666c-3.15477,7.41935 -11.42617,10.11281 -18.60856,6.56868c-3.1329,-1.5585 -5.48598,-4.33871 -6.50382,-7.68612c-1.40638,-4.6914 -0.57185,-27.38383 -0.56365,-33.59361c0,-1.37184 1.00143,-4.39478 1.76481,-5.64525c2.79909,-4.58688 6.25211,-5.61397 10.97743,-6.93314z" fill="#f90d0d" />
+            </Svg>
+          </Animated.View>
         </TouchableOpacity>
       </View>
     </View>
