@@ -4,6 +4,7 @@ import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -136,8 +137,12 @@ export default function HomeScreen() {
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <TouchableOpacity style={styles.searchIcon}>
-            <Ionicons name="location-outline" size={24} color="#000" />
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#000000ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <Circle cx="11" cy="11" r="8" />
+              <Path d="M21 21l-4.35-4.35" />
+            </Svg>
           </TouchableOpacity>
+
           <TextInput
             placeholder="Search here"
             placeholderTextColor="#999"
@@ -183,7 +188,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 30,
-    height: 60,
+    height: 55,
     paddingHorizontal: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -200,10 +205,10 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   voiceButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#000',
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    backgroundColor: '#101010ff',
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
   },
