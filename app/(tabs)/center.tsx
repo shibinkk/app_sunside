@@ -1,32 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 
+// This screen is now handled by a popup in the main TabLayout.
+// Navigation to this screen is intercepted in app/(tabs)/_layout.tsx.
 export default function CenterScreen() {
-    return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Add New Item</Text>
-            <Text style={styles.subtitle}>This screen is a placeholder for your center action.</Text>
-        </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: '#FFF' }} />;
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        padding: 20,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-    },
-});

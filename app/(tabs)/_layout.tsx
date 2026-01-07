@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,6 +16,7 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import TripPlannerPopup from '../../components/TripPlannerPopup';
 
 const ACTIVE_COLOR = '#000000ff';
 const INACTIVE_COLOR = '#757575';
@@ -67,72 +68,85 @@ function CenterTabButton(props: any) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const [popupVisible, setPopupVisible] = useState(false);
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: ACTIVE_COLOR,
-        tabBarInactiveTintColor: INACTIVE_COLOR,
-        tabBarShowLabel: true,
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarStyle: [
-          styles.tabBar,
-          {
-            height: 70 + insets.bottom,
-            paddingBottom: insets.bottom > 0 ? insets.bottom - 5 : 5,
-          },
-        ],
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
-          ),
+    <View style={{ flex: 1 }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: ACTIVE_COLOR,
+          tabBarInactiveTintColor: INACTIVE_COLOR,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: styles.tabLabel,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              height: 70 + insets.bottom,
+              paddingBottom: insets.bottom > 0 ? insets.bottom - 5 : 5,
+            },
+          ],
         }}
-      />
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="search"
+          options={{
+            title: 'Search',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="center"
-        options={{
-          tabBarLabel: '',
-          tabBarButton: (props) => <CenterTabButton {...props} />,
-        }}
-      />
+        <Tabs.Screen
+          name="center"
+          options={{
+            tabBarLabel: '',
+            tabBarButton: (props) => (
+              <CenterTabButton
+                {...props}
+                onPress={() => setPopupVisible(true)}
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'time' : 'time-outline'} size={24} color={color} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="history"
+          options={{
+            title: 'History',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'time' : 'time-outline'} size={24} color={color} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
-          ),
-        }}
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+      </Tabs>
+
+      <TripPlannerPopup
+        visible={popupVisible}
+        onClose={() => setPopupVisible(false)}
       />
-    </Tabs>
+    </View>
   );
 }
 
