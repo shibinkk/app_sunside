@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView, Animated, Keyboard } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Polyline, Marker } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Polygon } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -38,10 +38,40 @@ export default function HomeScreen() {
   const [destination, setDestination] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [boundary, setBoundary] = useState<any>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const animatedHeading = useRef(new Animated.Value(0)).current;
   const locateScale = useRef(new Animated.Value(1)).current;
   const weatherScale = useRef(new Animated.Value(1)).current;
   const mapRef = useRef<MapView>(null);
+  const loadingSpin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isLocating) {
+      Animated.loop(
+        Animated.timing(loadingSpin, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      loadingSpin.setValue(0);
+    }
+  }, [isLocating]);
+
+  const spin = loadingSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSuggestions([]);
+    setBoundary(null);
+    setDestination(null);
+    setRouteCoordinates([]);
+  };
 
   const getLocation = async () => {
     // Trigger animation
@@ -59,76 +89,47 @@ export default function HomeScreen() {
     ]).start();
 
     try {
-      // 1. Check if location services are enabled
-      let enabled = await Location.hasServicesEnabledAsync();
+      setIsLocating(true);
 
-      if (!enabled) {
-        Alert.alert(
-          'Location Services Disabled',
-          'For a better experience, please turn on device location and accuracy.',
-          [
-            { text: 'No, thanks', style: 'cancel' },
-            {
-              text: 'Turn on',
-              onPress: async () => {
-                if (Platform.OS === 'android') {
-                  // This often triggers the system accuracy dialog
-                  try {
-                    await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-                  } catch (e) {
-                    Linking.openSettings();
-                  }
-                } else {
-                  Linking.openSettings();
-                }
-              }
-            },
-          ]
-        );
-        return;
-      }
-
-      // 2. Request permissions
+      // 1. Request permissions (usually fast if already granted)
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        setIsLocating(false);
         setErrorMsg('Permission to access location was denied');
-        Alert.alert(
-          'Permission Denied',
-          'We need location permission to show your position on the map.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          ]
-        );
+        Alert.alert('Permission Denied', 'We need location permission to show your position.');
         return;
       }
 
-      // 3. Get current position
-      let location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      setLocation(location);
-
-      // Animate to current location
-      if (mapRef.current) {
+      // 2. Try to get last known position first (instant)
+      let lastKnown = await Location.getLastKnownPositionAsync({});
+      if (lastKnown && mapRef.current) {
+        setLocation(lastKnown);
         mapRef.current.animateToRegion({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
           latitudeDelta: 0.005,
           longitudeDelta: 0.005,
+        }, 600); // Faster animation for instant feel
+      }
+
+      // 3. Get fresh high-accuracy position in background
+      let freshLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // Balanced is faster than High
+      });
+
+      setLocation(freshLocation);
+      if (mapRef.current && !lastKnown) { // Only animate if we didn't already
+        mapRef.current.animateToRegion({
+          latitude: freshLocation.coords.latitude,
+          longitude: freshLocation.coords.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.01,
         }, 1000);
       }
     } catch (error: any) {
       console.error('Error getting location:', error);
-      setErrorMsg('Error getting location: ' + error.message);
-
-      if (error.message.includes('unsatisfied device settings')) {
-        Alert.alert(
-          'Location Error',
-          'Location request failed. Please ensure GPS is turned on and try again.',
-          [{ text: 'OK' }]
-        );
-      }
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -179,23 +180,98 @@ export default function HomeScreen() {
     }
   };
 
-  const handleSelectPlace = (feature: any) => {
+  const handleSelectPlace = async (feature: any) => {
     const [lon, lat] = feature.geometry.coordinates;
     const destCoords = { latitude: lat, longitude: lon };
 
     setSuggestions([]);
-    setSearchQuery(feature.properties.name || feature.properties.city || 'Selected Place');
 
-    // Set destination marker only
-    setDestination(destCoords);
-    setRouteCoordinates([]); // Clear any existing routes
+    // Reset current selection states
+    setBoundary(null);
+    setDestination(null);
+    setRouteCoordinates([]);
 
-    // Animate to found place
-    mapRef.current?.animateToRegion({
-      ...destCoords,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 1000);
+    const osmId = feature.properties.osm_id;
+    const osmType = feature.properties.osm_type;
+    const name = feature.properties.name;
+    const city = feature.properties.city;
+    const state = feature.properties.state;
+    const country = feature.properties.country;
+
+    // Choose the best display name: prefer city name if it's a city search
+    const displayName = name || city || 'Selected Place';
+    setSearchQuery(displayName);
+
+    const isPlace = feature.properties.osm_key === 'place' ||
+      ['city', 'town', 'village', 'state', 'country', 'administrative'].includes(feature.properties.osm_value);
+
+    const tryFetchBoundary = async (id: any, type: string, queryName?: string) => {
+      try {
+        let url = '';
+        if (id && type && type !== 'N' && type !== 'node') {
+          const typeChar = type.charAt(0).toUpperCase();
+          url = `https://nominatim.openstreetmap.org/lookup?osm_ids=${typeChar}${id}&format=json&polygon_geojson=1`;
+        } else if (queryName) {
+          // Search for boundaries specifically
+          url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryName)}&format=json&polygon_geojson=1&limit=3`;
+        } else {
+          return false;
+        }
+
+        const response = await fetch(url, {
+          headers: { 'User-Agent': 'Sunside-App-Search' }
+        });
+        const data = await response.json();
+
+        let results = Array.isArray(data) ? data : [data];
+
+        // Find the result that is a boundary/polygon
+        const bestResult = results.find((r: any) =>
+          r.geojson && (r.geojson.type === 'Polygon' || r.geojson.type === 'MultiPolygon')
+        ) || results[0];
+
+        if (bestResult && bestResult.geojson && (bestResult.geojson.type === 'Polygon' || bestResult.geojson.type === 'MultiPolygon')) {
+          setBoundary(bestResult.geojson);
+          if (bestResult.boundingbox && mapRef.current) {
+            const bbox = bestResult.boundingbox;
+            mapRef.current.fitToCoordinates([
+              { latitude: parseFloat(bbox[0]), longitude: parseFloat(bbox[2]) },
+              { latitude: parseFloat(bbox[1]), longitude: parseFloat(bbox[3]) }
+            ], {
+              edgePadding: { top: 100, right: 100, bottom: 120, left: 100 },
+              animated: true,
+            });
+          }
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error fetching boundary:', error);
+        return false;
+      }
+    };
+
+    let boundaryFound = false;
+    // 1. Try direct ID lookup if it's a relation/way
+    if (osmId && (osmType === 'R' || osmType === 'relation' || osmType === 'W' || osmType === 'way')) {
+      boundaryFound = await tryFetchBoundary(osmId, osmType);
+    }
+
+    // 2. If no boundary and it's a place name, try searching for the boundary specifically
+    if (!boundaryFound && isPlace && (name || city)) {
+      const searchTerms = [name, city, state, country].filter(Boolean).join(', ');
+      boundaryFound = await tryFetchBoundary(null, 'N', searchTerms);
+    }
+
+    if (!boundaryFound) {
+      // Fallback to marker
+      setDestination(destCoords);
+      mapRef.current?.animateToRegion({
+        ...destCoords,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 1000);
+    }
 
     // Hide keyboard
     Keyboard.dismiss();
@@ -276,6 +352,35 @@ export default function HomeScreen() {
         {destination && (
           <Marker coordinate={destination} title="Destination" />
         )}
+
+        {boundary && boundary.type === 'Polygon' && (
+          <Polygon
+            coordinates={boundary.coordinates[0].map((coord: any) => ({
+              latitude: coord[1],
+              longitude: coord[0],
+            }))}
+            strokeColor="#ff4444"
+            fillColor="rgba(255, 68, 68, 0.08)"
+            strokeWidth={2}
+            lineDashPattern={[5, 5]}
+          />
+        )}
+
+        {boundary && boundary.type === 'MultiPolygon' && (
+          boundary.coordinates.map((polygon: any, index: number) => (
+            <Polygon
+              key={index}
+              coordinates={polygon[0].map((coord: any) => ({
+                latitude: coord[1],
+                longitude: coord[0],
+              }))}
+              strokeColor="#ff4444"
+              fillColor="rgba(255, 68, 68, 0.08)"
+              strokeWidth={2}
+              lineDashPattern={[5, 5]}
+            />
+          ))
+        )}
       </MapView>
 
       {/* Header Search Bar */}
@@ -295,8 +400,15 @@ export default function HomeScreen() {
             value={searchQuery}
             onChangeText={searchPlaces}
           />
-          <TouchableOpacity style={styles.voiceButton}>
-            <MaterialIcons name="mic-none" size={24} color="#FFF" />
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={searchQuery.length > 0 ? clearSearch : undefined}
+          >
+            {searchQuery.length > 0 ? (
+              <Ionicons name="close" size={24} color="#FFF" />
+            ) : (
+              <MaterialIcons name="mic-none" size={24} color="#FFF" />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -371,16 +483,33 @@ export default function HomeScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.floatingButton} onPress={getLocation}>
           <Animated.View style={{ transform: [{ scale: locateScale }] }}>
-            <Svg width="30" height="30" viewBox="0 0 24 24">
-              {/* Outer Ring */}
-              <Circle cx="12" cy="12" r="8" stroke="#000" strokeWidth="1.5" fill="none" />
+            {isLocating ? (
+              <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                <Svg width="28" height="28" viewBox="0 0 24 24">
+                  {/* Rotating Gradient-like Dash */}
+                  <Circle cx="12" cy="12" r="9" stroke="#E0E0E0" strokeWidth="2" fill="none" />
+                  <Path
+                    d="M12 3 A9 9 0 0 1 21 12"
+                    stroke="#FF0000"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <Circle cx="12" cy="12" r="3" fill="#FF0000" />
+                </Svg>
+              </Animated.View>
+            ) : (
+              <Svg width="30" height="30" viewBox="0 0 24 24">
+                {/* Outer Ring */}
+                <Circle cx="12" cy="12" r="8" stroke="#000" strokeWidth="1.5" fill="none" />
 
-              {/* Crosshairs */}
-              <Path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                {/* Crosshairs */}
+                <Path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
 
-              {/* Red Center Stroke Circle */}
-              <Circle cx="12" cy="12" r="3.5" stroke="#FF0000" strokeWidth="1.5" fill="none" />
-            </Svg>
+                {/* Red Center Stroke Circle */}
+                <Circle cx="12" cy="12" r="3.5" stroke="#FF0000" strokeWidth="1.5" fill="none" />
+              </Svg>
+            )}
           </Animated.View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.floatingButton} onPress={handleWeatherPress}>
