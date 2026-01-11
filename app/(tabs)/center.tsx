@@ -11,7 +11,6 @@ import {
     ScrollView,
     Keyboard,
     FlatList,
-    Modal,
     KeyboardAvoidingView
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -19,7 +18,6 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
 const CONTAINER_PADDING = 40;
@@ -142,30 +140,28 @@ const TimePickerModal = ({ visible, initialDate, onClose, onSave }: any) => {
     if (!visible) return null;
 
     return (
-        <Modal transparent visible={visible} animationType="fade">
-            <View style={styles.tpOverlay}>
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={styles.tpCard}>
-                    <Text style={styles.tpTitle}>Select time</Text>
-                    <View style={styles.wheelsContainer}>
-                        <View style={styles.selectionHighlight} />
-                        <WheelPicker data={hours} selectedValue={selHour} onValueChange={setSelHour} visible={visible} />
-                        <View style={styles.separator}><Text style={styles.separatorText}>:</Text></View>
-                        <WheelPicker data={minutes} selectedValue={selMinute} onValueChange={setSelMinute} visible={visible} />
-                        <View style={styles.separator} />
-                        <WheelPicker data={periods} selectedValue={selPeriod} onValueChange={setSelPeriod} visible={visible} />
-                    </View>
-                    <View style={styles.tpFooter}>
-                        <TouchableOpacity onPress={onClose} style={styles.tpCancelBtn}>
-                            <Text style={styles.tpCancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleSave} style={styles.tpSaveBtn}>
-                            <Text style={styles.tpSaveText}>Save</Text>
-                        </TouchableOpacity>
-                    </View>
+        <View style={styles.tpOverlay}>
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={styles.tpCard}>
+                <Text style={styles.tpTitle}>Select time</Text>
+                <View style={styles.wheelsContainer}>
+                    <View style={styles.selectionHighlight} />
+                    <WheelPicker data={hours} selectedValue={selHour} onValueChange={setSelHour} visible={visible} />
+                    <View style={styles.separator}><Text style={styles.separatorText}>:</Text></View>
+                    <WheelPicker data={minutes} selectedValue={selMinute} onValueChange={setSelMinute} visible={visible} />
+                    <View style={styles.separator} />
+                    <WheelPicker data={periods} selectedValue={selPeriod} onValueChange={setSelPeriod} visible={visible} />
+                </View>
+                <View style={styles.tpFooter}>
+                    <TouchableOpacity onPress={onClose} style={styles.tpCancelBtn}>
+                        <Text style={styles.tpCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleSave} style={styles.tpSaveBtn}>
+                        <Text style={styles.tpSaveText}>Save</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
-        </Modal>
+        </View>
     );
 };
 
@@ -514,7 +510,7 @@ export default function CenterScreen() {
                         <Text style={[styles.label, { marginTop: 25 }]}>Time</Text>
                         <TouchableOpacity
                             activeOpacity={0.7}
-                            style={styles.inputContainer}
+                            style={styles.timeInputContainer}
                             onPress={() => setShowTimePicker(true)}
                         >
                             <View style={styles.clockIcon}>
@@ -564,12 +560,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        height: 60,
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
     },
     backButton: {
         width: 40,
         height: 40,
         justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitle: {
         fontSize: 20,
@@ -578,14 +577,14 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
     },
     formContainer: {
+        paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 40,
     },
     label: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
         color: '#AAA',
         marginLeft: 5,
@@ -596,7 +595,7 @@ const styles = StyleSheet.create({
     locationContainer: {
         flexDirection: 'row',
         backgroundColor: '#FFF',
-        borderRadius: 30,
+        borderRadius: 20,
         padding: 15,
         borderWidth: 1.5,
         borderColor: '#000',
@@ -606,26 +605,24 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF5F5',
     },
     iconsColumn: {
+        width: 30,
         alignItems: 'center',
+        justifyContent: 'center',
         paddingVertical: 10,
-        marginRight: 15,
-        width: 24,
     },
     donutIcon: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#000',
-        backgroundColor: 'transparent',
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 2.5,
+        backgroundColor: '#FFF',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 2,
     },
     donutFill: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 4,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: '#000',
     },
     lineTrack: {
@@ -641,33 +638,33 @@ const styles = StyleSheet.create({
     squareIcon: {
         width: 14,
         height: 14,
-        borderWidth: 2,
-        borderColor: '#000',
-        backgroundColor: 'transparent',
-        borderRadius: 2,
-        overflow: 'hidden',
-        justifyContent: 'flex-end',
+        borderWidth: 2.5,
+        backgroundColor: '#FFF',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     squareFill: {
-        width: '100%',
+        width: 8,
         backgroundColor: '#000',
     },
     inputsColumn: {
         flex: 1,
+        marginLeft: 15,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    clearBtn: {
-        padding: 5,
+        flex: 1,
     },
     locationInput: {
         flex: 1,
         height: 48,
         fontSize: 15,
         color: '#000',
-        fontWeight: '500',
+        fontWeight: '600',
+    },
+    clearBtn: {
+        padding: 5,
     },
     locationSeparator: {
         height: 1,
@@ -676,11 +673,17 @@ const styles = StyleSheet.create({
     },
     suggestionsWrapper: {
         backgroundColor: '#FFF',
-        borderRadius: 20,
-        marginTop: 10,
+        borderRadius: 15,
+        marginTop: 5,
         padding: 10,
         borderWidth: 1,
         borderColor: '#EEE',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 3,
+        zIndex: 10,
     },
     suggestionItem: {
         flexDirection: 'row',
@@ -701,7 +704,7 @@ const styles = StyleSheet.create({
     suggestionTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#333',
+        color: '#000',
     },
     suggestionSubtitle: {
         fontSize: 12,
@@ -710,8 +713,7 @@ const styles = StyleSheet.create({
     datePickerContainer: {
         backgroundColor: '#FFF',
         borderRadius: 30,
-        paddingVertical: 15,
-        paddingHorizontal: ITEM_WIDTH / 2,
+        paddingVertical: 20,
         borderWidth: 1.5,
         borderColor: '#000',
     },
@@ -726,8 +728,7 @@ const styles = StyleSheet.create({
         padding: 5,
     },
     monthDisplay: {
-        flex: 1,
-        alignItems: 'center',
+        marginHorizontal: 20,
     },
     monthYearText: {
         fontSize: 16,
@@ -735,21 +736,20 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     daysList: {
+        paddingHorizontal: 10,
     },
     dayPill: {
         alignItems: 'center',
-        justifyContent: 'space-between',
         height: 100,
+        justifyContent: 'center',
         borderRadius: 30,
-        paddingVertical: 12,
-        paddingBottom: 10,
     },
     dayPillSelected: {
         backgroundColor: '#ededed',
     },
     dayNameText: {
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '600',
         color: '#888',
         marginTop: 2,
     },
@@ -757,7 +757,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
         color: '#000',
-        marginBottom: 4,
     },
     dateCircle: {
         width: 38,
@@ -777,62 +776,60 @@ const styles = StyleSheet.create({
     },
     dateNumberText: {
         fontSize: 16,
-        fontWeight: '800',
+        fontWeight: '600',
         color: '#000',
     },
     dateNumberTextSelected: {
-        fontSize: 19,
+        fontSize: 18,
         fontWeight: '800',
         color: '#FFF',
     },
-    inputContainer: {
+    timeInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        borderRadius: 30,
-        paddingHorizontal: 15,
-        height: 56,
+        height: 65,
+        borderRadius: 32.5,
+        paddingHorizontal: 20,
         borderWidth: 1.5,
         borderColor: '#000',
     },
     clockIcon: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#000',
-        marginRight: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: '#000',
+        marginRight: 15,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    clockPin: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#000',
+    },
     clockHand: {
-        width: 2,
-        height: 6,
-        backgroundColor: '#FFF',
-        borderRadius: 1,
         position: 'absolute',
-        bottom: '50%',
-        transformOrigin: 'bottom',
+        width: 2,
+        height: 10,
+        backgroundColor: '#000',
+        top: 4,
+        borderRadius: 1,
     },
     clockHandShort: {
+        position: 'absolute',
         width: 2,
-        height: 8,
-        backgroundColor: '#FFF',
+        height: 7,
+        backgroundColor: '#000',
+        top: 7,
         borderRadius: 1,
-        position: 'absolute',
-        bottom: '50%',
-        transformOrigin: 'bottom',
-    },
-    clockPin: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: '#FFF',
-        position: 'absolute',
     },
     inputText: {
-        fontSize: 15,
+        fontSize: 18,
+        fontWeight: '800',
         color: '#000',
-        fontWeight: '700',
     },
     findButton: {
         backgroundColor: '#000',
@@ -845,11 +842,12 @@ const styles = StyleSheet.create({
     },
     findButtonText: {
         color: '#FFF',
-        fontSize: 18,
+        fontSize: 20,
+        fontWeight: '800',
         fontFamily: 'NicoMoji'
     },
     tpOverlay: {
-        flex: 1,
+        ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.4)',
@@ -862,21 +860,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     tpTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 25,
+        fontSize: 20,
+        fontWeight: '800',
+        marginBottom: 20,
+        color: '#000',
     },
     wheelsContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
         height: WHEEL_ITEM_HEIGHT * 3,
-        width: '100%',
+        alignItems: 'center',
         justifyContent: 'center',
     },
     wheelWrapper: {
+        width: 60,
         height: WHEEL_ITEM_HEIGHT * 3,
-        width: 70,
     },
     wheelItem: {
         justifyContent: 'center',
@@ -884,23 +881,13 @@ const styles = StyleSheet.create({
     },
     wheelItemText: {
         fontSize: 22,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     wheelItemTextActive: {
-        color: '#111827',
+        color: '#000',
     },
     wheelItemTextInactive: {
-        color: '#E5E7EB',
-    },
-    selectionHighlight: {
-        position: 'absolute',
-        height: WHEEL_ITEM_HEIGHT - 2,
-        width: '100%',
-        backgroundColor: 'transparent',
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
-        borderRadius: 12,
-        top: WHEEL_ITEM_HEIGHT + 1,
+        color: '#CCC',
     },
     separator: {
         width: 20,
@@ -908,32 +895,35 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     separatorText: {
-        fontSize: 24,
-        fontWeight: '400',
-        color: '#9CA3AF',
-        marginTop: -2,
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#000',
+    },
+    selectionHighlight: {
+        position: 'absolute',
+        height: WHEEL_ITEM_HEIGHT,
+        width: '100%',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 10,
+        zIndex: -1,
     },
     tpFooter: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         width: '100%',
-        justifyContent: 'flex-end',
-        marginTop: 35,
-        gap: 10,
-        alignItems: 'center',
+        marginTop: 24,
     },
     tpCancelBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
     },
     tpCancelText: {
         fontSize: 16,
-        fontWeight: '800',
-        color: '#1F2937',
+        fontWeight: '700',
+        color: '#AAA',
     },
     tpSaveBtn: {
-        backgroundColor: '#FFF',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
+        backgroundColor: '#000',
         borderRadius: 12,
         paddingVertical: 10,
         paddingHorizontal: 28,
@@ -941,6 +931,6 @@ const styles = StyleSheet.create({
     tpSaveText: {
         fontSize: 16,
         fontWeight: '800',
-        color: '#1F2937',
+        color: '#FFF',
     },
 });

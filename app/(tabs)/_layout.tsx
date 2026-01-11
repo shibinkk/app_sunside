@@ -1,9 +1,8 @@
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
-  Platform,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
