@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -45,6 +46,8 @@ export default function HomeScreen() {
   const weatherScale = useRef(new Animated.Value(1)).current;
   const mapRef = useRef<MapView>(null);
   const loadingSpin = useRef(new Animated.Value(0)).current;
+  const router = useRouter();
+  const params = useLocalSearchParams();
 
   useEffect(() => {
     if (isLocating) {
@@ -322,6 +325,17 @@ export default function HomeScreen() {
     getLocation();
   }, []);
 
+  useEffect(() => {
+    if (params.selectedPlace) {
+      try {
+        const feature = JSON.parse(params.selectedPlace as string);
+        handleSelectPlace(feature);
+      } catch (e) {
+        console.error("Error parsing selected place:", e);
+      }
+    }
+  }, [params.selectedPlace]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -383,26 +397,30 @@ export default function HomeScreen() {
         )}
       </MapView>
 
-      {/* Header Search Bar */}
+      {/* Header Search Bar Trigger */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <TouchableOpacity style={styles.searchIcon}>
+        <TouchableOpacity
+          style={styles.searchBar}
+          activeOpacity={0.9}
+          onPress={() => router.push('/search')}
+        >
+          <View style={styles.searchIcon}>
             <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#000000ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <Circle cx="11" cy="11" r="8" />
               <Path d="M21 21l-4.35-4.35" />
             </Svg>
-          </TouchableOpacity>
-
-          <TextInput
-            placeholder="Search here"
-            placeholderTextColor="#999"
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={searchPlaces}
-          />
+          </View>
+          <Text style={[styles.searchInput, { color: searchQuery ? '#000' : '#999' }]}>
+            {searchQuery || "Search here"}
+          </Text>
           <TouchableOpacity
             style={styles.voiceButton}
-            onPress={searchQuery.length > 0 ? clearSearch : undefined}
+            onPress={(e) => {
+              if (searchQuery.length > 0) {
+                e.stopPropagation();
+                clearSearch();
+              }
+            }}
           >
             {searchQuery.length > 0 ? (
               <Ionicons name="close" size={24} color="#FFF" />
@@ -410,36 +428,7 @@ export default function HomeScreen() {
               <MaterialIcons name="mic-none" size={24} color="#FFF" />
             )}
           </TouchableOpacity>
-        </View>
-
-        {suggestions.length > 0 && (
-          <View style={styles.suggestionsContainer}>
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {suggestions.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.suggestionItem,
-                    index === suggestions.length - 1 && { borderBottomWidth: 0 }
-                  ]}
-                  onPress={() => handleSelectPlace(item)}
-                >
-                  <Ionicons name="location-sharp" size={20} color="#666" style={{ marginRight: 10 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.suggestionTitle} numberOfLines={1}>
-                      {item.properties.name || item.properties.city || item.properties.street}
-                    </Text>
-                    <Text style={styles.suggestionSubtitle} numberOfLines={1}>
-                      {[item.properties.city, item.properties.state, item.properties.country]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        </TouchableOpacity>
       </View>
 
       {/* Floating Buttons */}
