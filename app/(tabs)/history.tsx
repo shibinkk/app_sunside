@@ -198,6 +198,6 @@ const styles = StyleSheet.create({
     exploreBtnText: {
         color: '#FFF',
         fontSize: 14,
-        fontWeight: '800',
+        fontFamily: 'NicoMoji',
     }
 });

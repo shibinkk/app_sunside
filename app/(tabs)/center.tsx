@@ -14,17 +14,18 @@ import {
     KeyboardAvoidingView
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Svg, { Circle, Line, G } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
-const CONTAINER_PADDING = 40;
+const CONTAINER_PADDING = 50; // Reduced padding for wider list
 const DATE_LIST_WIDTH = width - CONTAINER_PADDING;
-const ITEM_WIDTH = DATE_LIST_WIDTH / 6;
+const ITEM_WIDTH = DATE_LIST_WIDTH / 5;
 
-const WHEEL_ITEM_HEIGHT = 42;
+const WHEEL_ITEM_HEIGHT = 45;
 
 const WheelPicker = ({
     data,
@@ -175,6 +176,7 @@ export default function CenterScreen() {
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [activeField, setActiveField] = useState<'source' | 'destination' | null>(null);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     const sourceAnim = useRef(new Animated.Value(0)).current;
     const destAnim = useRef(new Animated.Value(0)).current;
@@ -188,9 +190,15 @@ export default function CenterScreen() {
         setSelectedDate(today);
         setCurrentMonth(today);
 
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
         setTimeout(() => {
             centerDate(today);
         }, 500);
+
+        return () => clearInterval(timer);
     }, []);
 
     useEffect(() => {
@@ -224,7 +232,7 @@ export default function CenterScreen() {
         }
 
         try {
-            const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+            const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lat=20.5937&lon=78.9629&lang=en`);
             const data = await response.json();
             setSuggestions(data.features || []);
         } catch (error) {
@@ -440,11 +448,11 @@ export default function CenterScreen() {
                             </View>
                         )}
 
-                        <Text style={[styles.label, { marginTop: 25 }]}>Date</Text>
+                        <Text style={[styles.label, { marginTop: 18 }]}>Date</Text>
                         <View style={styles.datePickerContainer}>
                             <View style={styles.monthSelector}>
                                 <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowBtn}>
-                                    <Ionicons name="chevron-back" size={18} color="#000" />
+                                    <Ionicons name="chevron-back" size={16} color="#000" />
                                 </TouchableOpacity>
                                 <View style={styles.monthDisplay}>
                                     <Text style={styles.monthYearText}>
@@ -452,7 +460,7 @@ export default function CenterScreen() {
                                     </Text>
                                 </View>
                                 <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrowBtn}>
-                                    <Ionicons name="chevron-forward" size={18} color="#000" />
+                                    <Ionicons name="chevron-forward" size={16} color="#000" />
                                 </TouchableOpacity>
                             </View>
 
@@ -473,56 +481,77 @@ export default function CenterScreen() {
                                 renderItem={({ item }) => {
                                     const isSelected = item.toDateString() === selectedDate.toDateString();
                                     return (
-                                        <TouchableOpacity
-                                            activeOpacity={1}
-                                            style={[styles.dayPill, { width: ITEM_WIDTH }, isSelected && styles.dayPillSelected]}
-                                            onPress={() => handleDateSelect(item)}
-                                        >
-                                            {isSelected ? (
-                                                <>
-                                                    <View style={styles.dateCircleSelected}>
-                                                        <Text style={styles.dateNumberTextSelected}>
-                                                            {item.getDate().toString().padStart(2, '0')}
+                                        <View style={{ width: ITEM_WIDTH, alignItems: 'center' }}>
+                                            <TouchableOpacity
+                                                activeOpacity={1}
+                                                style={[styles.dayPill, isSelected && styles.dayPillSelected]}
+                                                onPress={() => handleDateSelect(item)}
+                                            >
+                                                {isSelected ? (
+                                                    <>
+                                                        <View style={styles.dateCircleSelected}>
+                                                            <Text style={styles.dateNumberTextSelected}>
+                                                                {item.getDate().toString().padStart(2, '0')}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={styles.dayNameTextSelected}>
+                                                            {item.toLocaleString('default', { weekday: 'short' })}
                                                         </Text>
-                                                    </View>
-                                                    <Text style={styles.dayNameTextSelected}>
-                                                        {item.toLocaleString('default', { weekday: 'short' })}
-                                                    </Text>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Text style={styles.dayNameText}>
-                                                        {item.toLocaleString('default', { weekday: 'short' })}
-                                                    </Text>
-                                                    <View style={styles.dateCircle}>
-                                                        <Text style={styles.dateNumberText}>
-                                                            {item.getDate().toString().padStart(2, '0')}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Text style={styles.dayNameText}>
+                                                            {item.toLocaleString('default', { weekday: 'short' })}
                                                         </Text>
-                                                    </View>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
+                                                        <View style={styles.dateCircle}>
+                                                            <Text style={styles.dateNumberText}>
+                                                                {item.getDate().toString().padStart(2, '0')}
+                                                            </Text>
+                                                        </View>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
                                     );
                                 }}
                             />
                         </View>
 
-                        <Text style={[styles.label, { marginTop: 25 }]}>Time</Text>
+                        <Text style={[styles.label, { marginTop: 18 }]}>Time</Text>
                         <TouchableOpacity
                             activeOpacity={0.7}
                             style={styles.timeInputContainer}
                             onPress={() => setShowTimePicker(true)}
                         >
-                            <View style={styles.clockIcon}>
-                                <View style={[
-                                    styles.clockHand,
-                                    { transform: [{ rotate: `${(selectedDate.getHours() % 12) * 30 + selectedDate.getMinutes() * 0.5}deg` }] }
-                                ]} />
-                                <View style={[
-                                    styles.clockHandShort,
-                                    { transform: [{ rotate: `${selectedDate.getMinutes() * 6}deg` }] }
-                                ]} />
-                                <View style={styles.clockPin} />
+                            <View style={styles.clockIconContainer}>
+                                <Svg width="32" height="32" viewBox="0 0 32 32">
+                                    {/* Clock Face */}
+                                    <Circle cx="16" cy="16" r="14" stroke="#000" strokeWidth="2" fill="#FFF" />
+
+                                    {/* Hour Ticks */}
+                                    <Line x1="16" y1="4" x2="16" y2="7" stroke="#000" strokeWidth="1.5" />
+                                    <Line x1="16" y1="25" x2="16" y2="28" stroke="#000" strokeWidth="1.5" />
+                                    <Line x1="4" y1="16" x2="7" y2="16" stroke="#000" strokeWidth="1.5" />
+                                    <Line x1="25" y1="16" x2="28" y2="16" stroke="#000" strokeWidth="1.5" />
+
+                                    {/* Hour Hand */}
+                                    <G transform={`rotate(${(selectedDate.getHours() % 12) * 30 + selectedDate.getMinutes() * 0.5}, 16, 16)`}>
+                                        <Line x1="16" y1="16" x2="16" y2="9" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+                                    </G>
+
+                                    {/* Minute Hand */}
+                                    <G transform={`rotate(${selectedDate.getMinutes() * 6}, 16, 16)`}>
+                                        <Line x1="16" y1="16" x2="16" y2="6" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                                    </G>
+
+                                    {/* Seconds Hand - Realtime */}
+                                    <G transform={`rotate(${currentTime.getSeconds() * 6}, 16, 16)`}>
+                                        <Line x1="16" y1="16" x2="16" y2="5" stroke="#FF3B30" strokeWidth="1" strokeLinecap="round" />
+                                    </G>
+
+                                    {/* Center Pin */}
+                                    <Circle cx="16" cy="16" r="1.5" fill="#000" />
+                                </Svg>
                             </View>
                             <Text style={styles.inputText}>
                                 {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -580,17 +609,17 @@ const styles = StyleSheet.create({
     },
     formContainer: {
         paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 40,
+        paddingTop: 8,
+        paddingBottom: 20,
     },
     label: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
         color: '#AAA',
         marginLeft: 5,
         textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 10,
+        letterSpacing: 1.2,
+        marginBottom: 8,
     },
     locationContainer: {
         flexDirection: 'row',
@@ -712,10 +741,11 @@ const styles = StyleSheet.create({
     },
     datePickerContainer: {
         backgroundColor: '#FFF',
-        borderRadius: 30,
-        paddingVertical: 20,
+        borderRadius: 25,
+        paddingVertical: 15,
         borderWidth: 1.5,
         borderColor: '#000',
+        marginHorizontal: -5, // Widened to make pills bigger
     },
     monthSelector: {
         flexDirection: 'row',
@@ -736,27 +766,30 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     daysList: {
-        paddingHorizontal: 10,
+        paddingHorizontal: 0,
     },
     dayPill: {
         alignItems: 'center',
-        height: 100,
+        height: 95,
+        width: '90%', // Visual gap between pills
         justifyContent: 'center',
-        borderRadius: 30,
+        borderRadius: 25,
     },
     dayPillSelected: {
         backgroundColor: '#ededed',
+        width: '85%',
     },
     dayNameText: {
         fontSize: 12,
         fontWeight: '600',
         color: '#888',
-        marginTop: 2,
+        marginBottom: 6, // Increased gap
     },
     dayNameTextSelected: {
         fontSize: 13,
         fontWeight: '800',
         color: '#000',
+        marginTop: 8, // Increased gap
     },
     dateCircle: {
         width: 38,
@@ -772,7 +805,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: -2,
+        marginTop: -10, // Shifted upward
     },
     dateNumberText: {
         fontSize: 16,
@@ -788,43 +821,28 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        height: 65,
-        borderRadius: 32.5,
+        height: 55,
+        borderRadius: 27.5,
         paddingHorizontal: 20,
         borderWidth: 1.5,
         borderColor: '#000',
     },
-    clockIcon: {
+    clockIconContainer: {
         width: 32,
         height: 32,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#000',
         marginRight: 15,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    clockPin: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#000',
-    },
-    clockHand: {
-        position: 'absolute',
-        width: 2,
-        height: 10,
-        backgroundColor: '#000',
-        top: 4,
-        borderRadius: 1,
-    },
-    clockHandShort: {
-        position: 'absolute',
-        width: 2,
-        height: 7,
-        backgroundColor: '#000',
-        top: 7,
-        borderRadius: 1,
+    clockIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: '#000',
+        marginRight: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     inputText: {
         fontSize: 18,
@@ -833,17 +851,16 @@ const styles = StyleSheet.create({
     },
     findButton: {
         backgroundColor: '#000',
-        height: 60,
-        borderRadius: 18,
+        height: 55,
+        borderRadius: 15,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 25,
+        marginTop: 20,
     },
     findButtonText: {
         color: '#FFF',
         fontSize: 20,
-        fontWeight: '800',
         fontFamily: 'NicoMoji'
     },
     tpOverlay: {
@@ -919,8 +936,8 @@ const styles = StyleSheet.create({
     },
     tpCancelText: {
         fontSize: 16,
-        fontWeight: '700',
         color: '#AAA',
+        fontFamily: 'NicoMoji',
     },
     tpSaveBtn: {
         backgroundColor: '#000',
@@ -930,7 +947,7 @@ const styles = StyleSheet.create({
     },
     tpSaveText: {
         fontSize: 16,
-        fontWeight: '800',
         color: '#FFF',
+        fontFamily: 'NicoMoji',
     },
 });
