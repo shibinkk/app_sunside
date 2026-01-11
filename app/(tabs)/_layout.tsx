@@ -1,9 +1,8 @@
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
-  Platform,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,6 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
-import TripPlannerPopup from '../../components/TripPlannerPopup';
 
 const ACTIVE_COLOR = '#000000ff';
 const INACTIVE_COLOR = '#757575';
@@ -68,7 +66,6 @@ function CenterTabButton(props: any) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const [popupVisible, setPopupVisible] = useState(false);
 
   return (
     <View style={{ flex: 1 }}>
@@ -115,7 +112,6 @@ export default function TabLayout() {
             tabBarButton: (props) => (
               <CenterTabButton
                 {...props}
-                onPress={() => setPopupVisible(true)}
               />
             ),
           }}
@@ -141,11 +137,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-
-      <TripPlannerPopup
-        visible={popupVisible}
-        onClose={() => setPopupVisible(false)}
-      />
     </View>
   );
 }

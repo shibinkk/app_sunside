@@ -206,8 +206,8 @@ export default function HomeScreen() {
       ['city', 'town', 'village', 'state', 'country', 'administrative'].includes(feature.properties.osm_value);
 
     const tryFetchBoundary = async (id: any, type: string, queryName?: string) => {
+      let url = '';
       try {
-        let url = '';
         if (id && type && type !== 'N' && type !== 'node') {
           const typeChar = type.charAt(0).toUpperCase();
           url = `https://nominatim.openstreetmap.org/lookup?osm_ids=${typeChar}${id}&format=json&polygon_geojson=1`;
@@ -218,8 +218,11 @@ export default function HomeScreen() {
           return false;
         }
 
+        console.log('Fetching boundary from:', url);
         const response = await fetch(url, {
-          headers: { 'User-Agent': 'Sunside-App-Search' }
+          headers: {
+            'User-Agent': 'Sunside-Travel-App/1.0 (contact: user@example.com) React-Native-Fetch'
+          }
         });
         const data = await response.json();
 
@@ -245,8 +248,8 @@ export default function HomeScreen() {
           return true;
         }
         return false;
-      } catch (error) {
-        console.error('Error fetching boundary:', error);
+      } catch (error: any) {
+        console.error('Error fetching boundary for URL:', url, error.message || error);
         return false;
       }
     };
