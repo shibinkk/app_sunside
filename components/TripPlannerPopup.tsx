@@ -376,76 +376,9 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                             </TouchableOpacity>
 
                             <View style={styles.content}>
-                                <Text style={[styles.label, { marginTop: 10 }]}>Date</Text>
-                                <View style={styles.datePickerContainer}>
-                                    <View style={styles.monthSelector}>
-                                        <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowBtn}>
-                                            <Ionicons name="chevron-back" size={18} color="#000" />
-                                        </TouchableOpacity>
-                                        <View style={styles.monthDisplay}>
-                                            <Text style={styles.monthYearText}>
-                                                {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrowBtn}>
-                                            <Ionicons name="chevron-forward" size={18} color="#000" />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <FlatList
-                                        ref={flatListRef}
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        data={days}
-                                        keyExtractor={(item) => item.toISOString()}
-                                        getItemLayout={(data, index) => (
-                                            { length: ITEM_WIDTH, offset: ITEM_WIDTH * index, index }
-                                        )}
-                                        contentContainerStyle={styles.daysList}
-                                        snapToInterval={ITEM_WIDTH}
-                                        decelerationRate="fast"
-                                        renderItem={({ item }) => {
-                                            const isSelected = item.toDateString() === selectedDate.toDateString();
-                                            return (
-                                                <TouchableOpacity
-                                                    activeOpacity={1}
-                                                    style={[styles.dayPill, { width: ITEM_WIDTH }, isSelected && styles.dayPillSelected]}
-                                                    onPress={() => handleDateSelect(item)}
-                                                >
-                                                    {isSelected ? (
-                                                        <>
-                                                            <View style={styles.dateCircleSelected}>
-                                                                <Text style={styles.dateNumberTextSelected}>
-                                                                    {item.getDate().toString().padStart(2, '0')}
-                                                                </Text>
-                                                            </View>
-                                                            <Text style={styles.dayNameTextSelected}>
-                                                                {item.toLocaleString('default', { weekday: 'short' })}
-                                                            </Text>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Text style={styles.dayNameText}>
-                                                                {item.toLocaleString('default', { weekday: 'short' })}
-                                                            </Text>
-                                                            <View style={styles.dateCircle}>
-                                                                <Text style={styles.dateNumberText}>
-                                                                    {item.getDate().toString().padStart(2, '0')}
-                                                                </Text>
-                                                            </View>
-                                                        </>
-                                                    )}
-                                                </TouchableOpacity>
-                                            );
-                                        }}
-                                    />
-                                </View>
-
-                                <View
-                                    style={styles.scrollForm}
-                                >
+                                <View style={styles.scrollForm}>
                                     <View style={styles.formContainer}>
-                                        <Text style={[styles.label, { marginTop: 12 }]}>Choose Route</Text>
+                                        <Text style={[styles.label, { marginTop: 10 }]}>Choose Route</Text>
                                         <View style={styles.locationContainer}>
                                             <View style={styles.iconsColumn}>
                                                 <View style={styles.donutIcon} />
@@ -484,6 +417,71 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                             </View>
                                         </View>
 
+                                        <Text style={[styles.label, { marginTop: 12 }]}>Date</Text>
+                                        <View style={styles.datePickerContainer}>
+                                            <View style={styles.monthSelector}>
+                                                <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowBtn}>
+                                                    <Ionicons name="chevron-back" size={18} color="#000" />
+                                                </TouchableOpacity>
+                                                <View style={styles.monthDisplay}>
+                                                    <Text style={styles.monthYearText}>
+                                                        {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                                    </Text>
+                                                </View>
+                                                <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrowBtn}>
+                                                    <Ionicons name="chevron-forward" size={18} color="#000" />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <FlatList
+                                                ref={flatListRef}
+                                                horizontal
+                                                showsHorizontalScrollIndicator={false}
+                                                data={days}
+                                                keyExtractor={(item) => item.toISOString()}
+                                                getItemLayout={(data, index) => (
+                                                    { length: ITEM_WIDTH, offset: ITEM_WIDTH * index, index }
+                                                )}
+                                                contentContainerStyle={styles.daysList}
+                                                snapToInterval={ITEM_WIDTH}
+                                                decelerationRate="fast"
+                                                renderItem={({ item }) => {
+                                                    const isSelected = item.toDateString() === selectedDate.toDateString();
+                                                    return (
+                                                        <TouchableOpacity
+                                                            activeOpacity={1}
+                                                            style={[styles.dayPill, { width: ITEM_WIDTH }, isSelected && styles.dayPillSelected]}
+                                                            onPress={() => handleDateSelect(item)}
+                                                        >
+                                                            {isSelected ? (
+                                                                <>
+                                                                    <View style={styles.dateCircleSelected}>
+                                                                        <Text style={styles.dateNumberTextSelected}>
+                                                                            {item.getDate().toString().padStart(2, '0')}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <Text style={styles.dayNameTextSelected}>
+                                                                        {item.toLocaleString('default', { weekday: 'short' })}
+                                                                    </Text>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Text style={styles.dayNameText}>
+                                                                        {item.toLocaleString('default', { weekday: 'short' })}
+                                                                    </Text>
+                                                                    <View style={styles.dateCircle}>
+                                                                        <Text style={styles.dateNumberText}>
+                                                                            {item.getDate().toString().padStart(2, '0')}
+                                                                        </Text>
+                                                                    </View>
+                                                                </>
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    );
+                                                }}
+                                            />
+                                        </View>
+
                                         <View style={styles.inputGroup}>
                                             <Text style={[styles.label, { marginTop: 12 }]}>Time</Text>
                                             <TouchableOpacity
@@ -491,7 +489,17 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                                 style={styles.inputContainer}
                                                 onPress={() => setShowTimePicker(true)}
                                             >
-                                                <Ionicons name="time-sharp" size={18} color="#000000ff" style={styles.inputIcon} />
+                                                <View style={styles.clockIcon}>
+                                                    <View style={[
+                                                        styles.clockHand,
+                                                        { transform: [{ rotate: `${(selectedDate.getHours() % 12) * 30 + selectedDate.getMinutes() * 0.5}deg` }] }
+                                                    ]} />
+                                                    <View style={[
+                                                        styles.clockHandShort,
+                                                        { transform: [{ rotate: `${selectedDate.getMinutes() * 6}deg` }] }
+                                                    ]} />
+                                                    <View style={styles.clockPin} />
+                                                </View>
                                                 <Text style={styles.inputText}>
                                                     {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </Text>
@@ -503,8 +511,7 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                             style={styles.findButton}
                                             onPress={handleClose}
                                         >
-                                            <Text style={styles.findButtonText}>Search Rides</Text>
-                                            <MaterialIcons name="search" size={24} color="#FFF" />
+                                            <Text style={styles.findButtonText}>Find</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -720,7 +727,7 @@ const styles = StyleSheet.create({
         height: 48,
         fontSize: 15,
         color: '#000',
-        fontWeight: '700',
+        fontWeight: '500',
     },
     locationSeparator: {
         height: 1,
@@ -760,6 +767,40 @@ const styles = StyleSheet.create({
     inputIcon: {
         marginRight: 12,
     },
+    clockIcon: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#000',
+        marginRight: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    clockHand: {
+        width: 2,
+        height: 6,
+        backgroundColor: '#FFF',
+        borderRadius: 1,
+        position: 'absolute',
+        bottom: '50%',
+        transformOrigin: 'bottom',
+    },
+    clockHandShort: {
+        width: 2,
+        height: 8,
+        backgroundColor: '#FFF',
+        borderRadius: 1,
+        position: 'absolute',
+        bottom: '50%',
+        transformOrigin: 'bottom',
+    },
+    clockPin: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: '#FFF',
+        position: 'absolute',
+    },
     input: {
         flex: 1,
         fontSize: 14,
@@ -784,8 +825,7 @@ const styles = StyleSheet.create({
     findButtonText: {
         color: '#FFF',
         fontSize: 18,
-        fontWeight: '900',
-        marginRight: 10,
+        fontFamily: 'NicoMoji',
     },
     // Custom Time Picker Styles
     tpOverlay: {

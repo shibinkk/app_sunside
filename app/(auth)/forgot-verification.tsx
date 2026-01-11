@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     verifyButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'NicoMoji',
     },
     resendContainer: {
         flexDirection: 'row',

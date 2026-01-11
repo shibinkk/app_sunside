@@ -306,8 +306,7 @@ export default function RegisterScreen() {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <>
-                <Text style={styles.nextButtonText}>Next</Text>
-                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" style={{ marginTop: 3 }} />
+                <Text style={styles.nextButtonText}>Register</Text>
               </>
             )}
           </TouchableOpacity>
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'NicoMoji',
     marginRight: 6,
   },
   loginContainer: {

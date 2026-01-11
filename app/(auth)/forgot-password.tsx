@@ -133,8 +133,7 @@ export default function ForgotPasswordScreen() {
                             <ActivityIndicator color="#FFFFFF" />
                         ) : (
                             <>
-                                <Text style={styles.nextButtonText}>Next</Text>
-                                <Ionicons name="chevron-forward" size={20} color="#FFF" style={{ marginLeft: 4 }} />
+                                <Text style={styles.nextButtonText}>Send OTP</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -227,7 +226,7 @@ const styles = StyleSheet.create({
     nextButtonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'NicoMoji',
     },
     footer: {
         flexDirection: 'row',
