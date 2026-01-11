@@ -16,18 +16,176 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 // Calculate width to fit exactly 7 items
 const CONTAINER_PADDING = 40;
 const DATE_LIST_WIDTH = width - CONTAINER_PADDING;
-const ITEM_WIDTH = DATE_LIST_WIDTH / 5.6;
+const ITEM_WIDTH = DATE_LIST_WIDTH / 6;
 
 interface TripPlannerPopupProps {
     visible: boolean;
     onClose: () => void;
 }
+
+const WHEEL_ITEM_HEIGHT = 42;
+const WHEEL_VISIBLE_ITEMS = 3;
+
+const WheelPicker = ({
+    data,
+    selectedValue,
+    onValueChange,
+    visible
+}: {
+    data: string[],
+    selectedValue: string,
+    onValueChange: (val: string) => void,
+    visible: boolean
+}) => {
+    const listRef = useRef<FlatList>(null);
+
+    // One empty string on each side to center the selection in a 3-item visible list
+    const paddingData = ["", ...data, ""];
+
+    useEffect(() => {
+        if (visible) {
+            const index = data.indexOf(selectedValue);
+            if (index !== -1 && listRef.current) {
+                setTimeout(() => {
+                    listRef.current?.scrollToOffset({
+                        offset: index * WHEEL_ITEM_HEIGHT,
+                        animated: false
+                    });
+                }, 50);
+            }
+        }
+    }, [visible, data, selectedValue]);
+
+    const handleMomentumScrollEnd = (event: any) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / WHEEL_ITEM_HEIGHT);
+        if (index >= 0 && index < data.length) {
+            onValueChange(data[index]);
+            Haptics.selectionAsync();
+        }
+    };
+
+    const lastHapticIndex = useRef(-1);
+    const handleScroll = (event: any) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / WHEEL_ITEM_HEIGHT);
+        if (index !== lastHapticIndex.current && index >= 0 && index < data.length) {
+            lastHapticIndex.current = index;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+    };
+
+    return (
+        <View style={styles.wheelWrapper}>
+            <FlatList
+                ref={listRef}
+                data={paddingData}
+                keyExtractor={(_, i) => i.toString()}
+                renderItem={({ item, index }) => {
+                    const realIndex = index - 1;
+                    const isSelected = data[realIndex] === selectedValue;
+                    return (
+                        <View style={[styles.wheelItem, { height: WHEEL_ITEM_HEIGHT }]}>
+                            <Text style={[
+                                styles.wheelItemText,
+                                isSelected ? styles.wheelItemTextActive : styles.wheelItemTextInactive
+                            ]}>
+                                {item}
+                            </Text>
+                        </View>
+                    );
+                }}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={WHEEL_ITEM_HEIGHT}
+                decelerationRate={Platform.OS === 'ios' ? 0.985 : 'fast'}
+                onMomentumScrollEnd={handleMomentumScrollEnd}
+                onScroll={handleScroll}
+                scrollEventThrottle={32}
+                getItemLayout={(_, index) => ({
+                    length: WHEEL_ITEM_HEIGHT,
+                    offset: WHEEL_ITEM_HEIGHT * index,
+                    index
+                })}
+            />
+        </View>
+    );
+};
+
+interface TimePickerModalProps {
+    visible: boolean;
+    initialDate: Date;
+    onClose: () => void;
+    onSave: (date: Date) => void;
+}
+
+const TimePickerModal = ({ visible, initialDate, onClose, onSave }: TimePickerModalProps) => {
+    const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+    const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+    const periods = ["AM", "PM"];
+
+    const getInitialHour = () => {
+        let h = initialDate.getHours();
+        const period = h >= 12 ? "PM" : "AM";
+        h = h % 12;
+        h = h ? h : 12; // 0 should be 12
+        return { hour: h.toString().padStart(2, '0'), period };
+    };
+
+    const initial = getInitialHour();
+    const [selHour, setSelHour] = useState(initial.hour);
+    const [selMinute, setSelMinute] = useState(initialDate.getMinutes().toString().padStart(2, '0'));
+    const [selPeriod, setSelPeriod] = useState(initial.period);
+
+    const handleSave = () => {
+        let h = parseInt(selHour);
+        if (selPeriod === "PM" && h < 12) h += 12;
+        if (selPeriod === "AM" && h === 12) h = 0;
+
+        const newDate = new Date(initialDate);
+        newDate.setHours(h);
+        newDate.setMinutes(parseInt(selMinute));
+        onSave(newDate);
+    };
+
+    if (!visible) return null;
+
+    return (
+        <Modal transparent visible={visible} animationType="fade">
+            <View style={styles.tpOverlay}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.tpCard}>
+                    <Text style={styles.tpTitle}>Select time</Text>
+
+                    <View style={styles.wheelsContainer}>
+                        {/* Highlights the selection area */}
+                        <View style={styles.selectionHighlight} />
+
+                        <WheelPicker data={hours} selectedValue={selHour} onValueChange={setSelHour} visible={visible} />
+                        <View style={styles.separator}><Text style={styles.separatorText}>:</Text></View>
+                        <WheelPicker data={minutes} selectedValue={selMinute} onValueChange={setSelMinute} visible={visible} />
+                        <View style={styles.separator} />
+                        <WheelPicker data={periods} selectedValue={selPeriod} onValueChange={setSelPeriod} visible={visible} />
+                    </View>
+
+                    <View style={styles.tpFooter}>
+                        <TouchableOpacity onPress={onClose} style={styles.tpCancelBtn}>
+                            <Text style={styles.tpCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleSave} style={styles.tpSaveBtn}>
+                            <Text style={styles.tpSaveText}>Save</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+};
 
 export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupProps) {
     const [source, setSource] = useState('');
@@ -36,8 +194,9 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [showTimePicker, setShowTimePicker] = useState(false);
 
-    const slideAnim = useRef(new Animated.Value(height)).current;
+    const openAnim = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const lineAnim = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -49,39 +208,52 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
             Animated.parallel([
                 Animated.timing(fadeAnim, {
                     toValue: 1,
-                    duration: 300,
+                    duration: 350,
                     useNativeDriver: true,
                 }),
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    friction: 9,
-                    tension: 60,
+                Animated.spring(openAnim, {
+                    toValue: 1,
+                    friction: 8,
+                    tension: 50,
                     useNativeDriver: true,
+                    restSpeedThreshold: 0.001,
+                    restDisplacementThreshold: 0.001,
+                }),
+                Animated.timing(lineAnim, {
+                    toValue: 1,
+                    duration: 700,
+                    delay: 350,
+                    useNativeDriver: false,
                 })
             ]).start();
 
             setTimeout(() => {
                 centerDate(today);
             }, 500);
-        } else {
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(slideAnim, {
-                    toValue: height,
-                    duration: 250,
-                    useNativeDriver: true,
-                })
-            ]).start();
         }
     }, [visible]);
 
     const handleClose = () => {
         Keyboard.dismiss();
-        onClose();
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(openAnim, {
+                toValue: 0,
+                duration: 350,
+                useNativeDriver: true,
+            }),
+            Animated.timing(lineAnim, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: false,
+            })
+        ]).start(() => {
+            onClose();
+        });
     };
 
     const days = useMemo(() => {
@@ -120,14 +292,9 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
         setTimeout(() => centerDate(selectedDate), 100);
     };
 
-    const onTimeChange = (event: any, selectedTime?: Date) => {
+    const onTimeSave = (newDate: Date) => {
         setShowTimePicker(false);
-        if (selectedTime) {
-            const newDate = new Date(selectedDate);
-            newDate.setHours(selectedTime.getHours());
-            newDate.setMinutes(selectedTime.getMinutes());
-            setSelectedDate(newDate);
-        }
+        setSelectedDate(newDate);
     };
 
     if (!visible) return null;
@@ -157,16 +324,59 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                     <Animated.View
                         style={[
                             styles.popup,
-                            { transform: [{ translateY: slideAnim }] }
+                            {
+                                opacity: openAnim.interpolate({
+                                    inputRange: [0, 0.2, 1],
+                                    outputRange: [0, 1, 1]
+                                }),
+                                borderTopLeftRadius: openAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [100, 40]
+                                }),
+                                borderTopRightRadius: openAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [100, 40]
+                                }),
+                                transform: [
+                                    {
+                                        translateY: openAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [height * 0.35, 0]
+                                        })
+                                    },
+                                    {
+                                        scale: openAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0.01, 1]
+                                        })
+                                    }
+                                ]
+                            }
                         ]}
                     >
-                        {/* Wrapper to ensure handle and content are within rounded view */}
-                        <View style={styles.popupInner}>
-                            <View style={styles.handle} />
+                        <Animated.View style={[
+                            styles.popupInner,
+                            {
+                                borderTopLeftRadius: openAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [100, 40]
+                                }),
+                                borderTopRightRadius: openAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [100, 40]
+                                }),
+                            }
+                        ]}>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={handleClose}
+                                style={styles.handleContainer}
+                            >
+                                <View style={styles.handle} />
+                            </TouchableOpacity>
 
                             <View style={styles.content}>
-                                <Text style={styles.sectionTitle}>Find your perfect side</Text>
-
+                                <Text style={[styles.label, { marginTop: 10 }]}>Date</Text>
                                 <View style={styles.datePickerContainer}>
                                     <View style={styles.monthSelector}>
                                         <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowBtn}>
@@ -231,33 +441,42 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                     />
                                 </View>
 
-                                <ScrollView
-                                    showsVerticalScrollIndicator={false}
-                                    keyboardShouldPersistTaps="handled"
+                                <View
                                     style={styles.scrollForm}
                                 >
                                     <View style={styles.formContainer}>
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Starting Point</Text>
-                                            <View style={styles.inputContainer}>
-                                                <Ionicons name="location-sharp" size={18} color="#000000ff" style={styles.inputIcon} />
+                                        <Text style={[styles.label, { marginTop: 12 }]}>Choose Route</Text>
+                                        <View style={styles.locationContainer}>
+                                            <View style={styles.iconsColumn}>
+                                                <View style={styles.donutIcon} />
+                                                <View style={styles.lineTrack}>
+                                                    <Animated.View
+                                                        style={[
+                                                            styles.activeLine,
+                                                            {
+                                                                height: lineAnim.interpolate({
+                                                                    inputRange: [0, 1],
+                                                                    outputRange: ['0%', '100%']
+                                                                })
+                                                            }
+                                                        ]}
+                                                    />
+                                                </View>
+                                                <View style={styles.squareIcon} />
+                                            </View>
+
+                                            <View style={styles.inputsColumn}>
                                                 <TextInput
                                                     placeholder="Enter source place"
-                                                    style={styles.input}
+                                                    style={styles.locationInput}
                                                     value={source}
                                                     onChangeText={setSource}
                                                     placeholderTextColor="#999"
                                                 />
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Destination</Text>
-                                            <View style={styles.inputContainer}>
-                                                <Ionicons name="navigate-sharp" size={18} color="#000000ff" style={styles.inputIcon} />
+                                                <View style={styles.locationSeparator} />
                                                 <TextInput
                                                     placeholder="Enter destination"
-                                                    style={styles.input}
+                                                    style={styles.locationInput}
                                                     value={destination}
                                                     onChangeText={setDestination}
                                                     placeholderTextColor="#999"
@@ -266,7 +485,7 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                         </View>
 
                                         <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Time</Text>
+                                            <Text style={[styles.label, { marginTop: 12 }]}>Time</Text>
                                             <TouchableOpacity
                                                 activeOpacity={0.7}
                                                 style={styles.inputContainer}
@@ -288,18 +507,19 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
                                             <MaterialIcons name="search" size={24} color="#FFF" />
                                         </TouchableOpacity>
                                     </View>
-                                </ScrollView>
+                                </View>
                             </View>
-                        </View>
+                        </Animated.View>
 
-                        {showTimePicker && (
-                            <DateTimePicker
-                                value={selectedDate}
-                                mode="time"
-                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={onTimeChange}
-                            />
-                        )}
+                        <TimePickerModal
+                            visible={showTimePicker}
+                            initialDate={selectedDate}
+                            onClose={() => setShowTimePicker(false)}
+                            onSave={onTimeSave}
+                        />
+
+                        {/* Extra bottom to cover gaps on some devices */}
+                        <View style={styles.bottomFill} />
                     </Animated.View>
                 </KeyboardAvoidingView>
             </View>
@@ -310,6 +530,7 @@ export default function TripPlannerPopup({ visible, onClose }: TripPlannerPopupP
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: 'transparent',
         justifyContent: 'flex-end',
     },
     overlay: {
@@ -320,34 +541,39 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     modalContent: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: 'transparent',
         justifyContent: 'flex-end',
     },
     popup: {
-        backgroundColor: 'transparent', // Crucial: background of the animated view itself should be transparent
-        height: height * 0.72,
+        backgroundColor: '#ffffffff',
+        height: height * 0.76,
         width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 25,
+        overflow: 'hidden',
     },
     popupInner: {
         flex: 1,
         backgroundColor: '#ffffffff',
-        borderTopLeftRadius: 40,
-        borderTopRightRadius: 40,
-        paddingBottom: Platform.OS === 'ios' ? 35 : 15,
-        overflow: 'hidden', // Ensures contents don't bleed out of rounded corners
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 15,
-        elevation: 20,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        overflow: 'hidden',
+    },
+    handleContainer: {
+        width: '100%',
+        paddingVertical: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     handle: {
         width: 45,
         height: 5,
         backgroundColor: '#E5E5E5',
         borderRadius: 10,
-        alignSelf: 'center',
-        marginTop: 15,
-        marginBottom: 5,
     },
     content: {
         flex: 1,
@@ -364,8 +590,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffffff',
         borderRadius: 30,
         paddingVertical: 15,
-        marginBottom: 10,
-        borderWidth: 1,
+        paddingHorizontal: ITEM_WIDTH / 2,
+        borderWidth: 1.5,
         borderColor: '#000000ff',
     },
     monthSelector: {
@@ -447,10 +673,69 @@ const styles = StyleSheet.create({
     },
     formContainer: {
         paddingTop: 5,
-        gap: 12,
+    },
+    locationContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#FFF',
+        borderRadius: 30,
+        padding: 15,
+        borderWidth: 1.5,
+        borderColor: '#000000ff',
+    },
+    iconsColumn: {
+        alignItems: 'center',
+        paddingVertical: 10,
+        marginRight: 15,
+        width: 24,
+    },
+    donutIcon: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 3,
+        borderColor: '#000',
+        backgroundColor: 'transparent',
+    },
+    lineTrack: {
+        width: 2,
+        flex: 1,
+        backgroundColor: '#E5E5E5',
+        marginVertical: 4,
+    },
+    activeLine: {
+        width: '100%',
+        backgroundColor: '#000',
+    },
+    squareIcon: {
+        width: 12,
+        height: 12,
+        backgroundColor: '#000',
+        borderRadius: 2,
+    },
+    inputsColumn: {
+        flex: 1,
+        gap: 0,
+    },
+    locationInput: {
+        height: 48,
+        fontSize: 15,
+        color: '#000',
+        fontWeight: '700',
+    },
+    locationSeparator: {
+        height: 1,
+        backgroundColor: '#F0F0F0',
+        width: '100%',
+    },
+    bottomFill: {
+        height: 100,
+        backgroundColor: '#ffffffff',
+        position: 'absolute',
+        bottom: -100,
+        left: 0,
+        right: 0,
     },
     inputGroup: {
-        gap: 6,
     },
     label: {
         fontSize: 11,
@@ -459,16 +744,18 @@ const styles = StyleSheet.create({
         marginLeft: 5,
         textTransform: 'uppercase',
         letterSpacing: 1,
+        marginTop: 20,
+        marginBottom: 10,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FAFAFA',
-        borderRadius: 15,
+        backgroundColor: '#FFF',
+        borderRadius: 30,
         paddingHorizontal: 15,
         height: 56,
         borderWidth: 1.5,
-        borderColor: '#F5F5F5',
+        borderColor: '#000000ff',
     },
     inputIcon: {
         marginRight: 12,
@@ -480,7 +767,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     inputText: {
-        fontSize: 14,
+        fontSize: 15,
         color: '#000',
         fontWeight: '700',
     },
@@ -491,18 +778,119 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 25,
         marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 8,
     },
     findButtonText: {
         color: '#FFF',
         fontSize: 18,
         fontWeight: '900',
         marginRight: 10,
+    },
+    // Custom Time Picker Styles
+    tpOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    tpCard: {
+        width: width * 0.85,
+        backgroundColor: '#FFF',
+        borderRadius: 30,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 15 },
+        shadowOpacity: 0.15,
+        shadowRadius: 30,
+        elevation: 12,
+    },
+    tpTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 25,
+    },
+    wheelsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: WHEEL_ITEM_HEIGHT * 3,
+        width: '100%',
+        justifyContent: 'center',
+    },
+    wheelWrapper: {
+        height: WHEEL_ITEM_HEIGHT * 3,
+        width: 70,
+    },
+    wheelItem: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    wheelItemText: {
+        fontSize: 22,
+        fontWeight: '600',
+    },
+    wheelItemTextActive: {
+        color: '#111827',
+    },
+    wheelItemTextInactive: {
+        color: '#E5E7EB',
+    },
+    selectionHighlight: {
+        position: 'absolute',
+        height: WHEEL_ITEM_HEIGHT - 2,
+        width: '100%',
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        borderRadius: 12,
+        top: WHEEL_ITEM_HEIGHT + 1,
+    },
+    separator: {
+        width: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    separatorText: {
+        fontSize: 24,
+        fontWeight: '400',
+        color: '#9CA3AF',
+        marginTop: -2,
+    },
+    tpFooter: {
+        flexDirection: 'row',
+        width: '100%',
+        justifyContent: 'flex-end',
+        marginTop: 35,
+        gap: 10,
+        alignItems: 'center',
+    },
+    tpCancelBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+    },
+    tpCancelText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1F2937',
+    },
+    tpSaveBtn: {
+        backgroundColor: '#FFF',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 28,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 1,
+    },
+    tpSaveText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1F2937',
     },
 });
