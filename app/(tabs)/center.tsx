@@ -13,164 +13,31 @@ import {
     FlatList,
     KeyboardAvoidingView
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, G } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TimePickerModal } from 'react-native-paper-dates';
+import { en, registerTranslation } from 'react-native-paper-dates';
 
-const { width, height } = Dimensions.get('window');
+registerTranslation('en', en);
+
+const { width } = Dimensions.get('window');
 const CONTAINER_PADDING = 50; // Reduced padding for wider list
 const DATE_LIST_WIDTH = width - CONTAINER_PADDING;
 const ITEM_WIDTH = DATE_LIST_WIDTH / 5;
 
-const WHEEL_ITEM_HEIGHT = 45;
 
-const WheelPicker = ({
-    data,
-    selectedValue,
-    onValueChange,
-    visible
-}: {
-    data: string[],
-    selectedValue: string,
-    onValueChange: (val: string) => void,
-    visible: boolean
-}) => {
-    const listRef = useRef<FlatList>(null);
-    const paddingData = ["", ...data, ""];
-
-    useEffect(() => {
-        if (visible) {
-            const index = data.indexOf(selectedValue);
-            if (index !== -1 && listRef.current) {
-                setTimeout(() => {
-                    listRef.current?.scrollToOffset({
-                        offset: index * WHEEL_ITEM_HEIGHT,
-                        animated: false
-                    });
-                }, 50);
-            }
-        }
-    }, [visible, data, selectedValue]);
-
-    const handleMomentumScrollEnd = (event: any) => {
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / WHEEL_ITEM_HEIGHT);
-        if (index >= 0 && index < data.length) {
-            onValueChange(data[index]);
-            Haptics.selectionAsync();
-        }
-    };
-
-    const lastHapticIndex = useRef(-1);
-    const handleScroll = (event: any) => {
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / WHEEL_ITEM_HEIGHT);
-        if (index !== lastHapticIndex.current && index >= 0 && index < data.length) {
-            lastHapticIndex.current = index;
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-    };
-
-    return (
-        <View style={styles.wheelWrapper}>
-            <FlatList
-                ref={listRef}
-                data={paddingData}
-                keyExtractor={(_, i) => i.toString()}
-                renderItem={({ item, index }) => {
-                    const realIndex = index - 1;
-                    const isSelected = data[realIndex] === selectedValue;
-                    return (
-                        <View style={[styles.wheelItem, { height: WHEEL_ITEM_HEIGHT }]}>
-                            <Text style={[
-                                styles.wheelItemText,
-                                isSelected ? styles.wheelItemTextActive : styles.wheelItemTextInactive
-                            ]}>
-                                {item}
-                            </Text>
-                        </View>
-                    );
-                }}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={WHEEL_ITEM_HEIGHT}
-                decelerationRate={Platform.OS === 'ios' ? 0.985 : 'fast'}
-                onMomentumScrollEnd={handleMomentumScrollEnd}
-                onScroll={handleScroll}
-                scrollEventThrottle={32}
-                getItemLayout={(_, index) => ({
-                    length: WHEEL_ITEM_HEIGHT,
-                    offset: WHEEL_ITEM_HEIGHT * index,
-                    index
-                })}
-            />
-        </View>
-    );
-};
-
-const TimePickerModal = ({ visible, initialDate, onClose, onSave }: any) => {
-    const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-    const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
-    const periods = ["AM", "PM"];
-
-    const getInitialHour = () => {
-        let h = initialDate.getHours();
-        const period = h >= 12 ? "PM" : "AM";
-        h = h % 12;
-        h = h ? h : 12;
-        return { hour: h.toString().padStart(2, '0'), period };
-    };
-
-    const initial = getInitialHour();
-    const [selHour, setSelHour] = useState(initial.hour);
-    const [selMinute, setSelMinute] = useState(initialDate.getMinutes().toString().padStart(2, '0'));
-    const [selPeriod, setSelPeriod] = useState(initial.period);
-
-    const handleSave = () => {
-        let h = parseInt(selHour);
-        if (selPeriod === "PM" && h < 12) h += 12;
-        if (selPeriod === "AM" && h === 12) h = 0;
-        const newDate = new Date(initialDate);
-        newDate.setHours(h);
-        newDate.setMinutes(parseInt(selMinute));
-        onSave(newDate);
-    };
-
-    if (!visible) return null;
-
-    return (
-        <View style={styles.tpOverlay}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={styles.tpCard}>
-                <Text style={styles.tpTitle}>Select time</Text>
-                <View style={styles.wheelsContainer}>
-                    <View style={styles.selectionHighlight} />
-                    <WheelPicker data={hours} selectedValue={selHour} onValueChange={setSelHour} visible={visible} />
-                    <View style={styles.separator}><Text style={styles.separatorText}>:</Text></View>
-                    <WheelPicker data={minutes} selectedValue={selMinute} onValueChange={setSelMinute} visible={visible} />
-                    <View style={styles.separator} />
-                    <WheelPicker data={periods} selectedValue={selPeriod} onValueChange={setSelPeriod} visible={visible} />
-                </View>
-                <View style={styles.tpFooter}>
-                    <TouchableOpacity onPress={onClose} style={styles.tpCancelBtn}>
-                        <Text style={styles.tpCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleSave} style={styles.tpSaveBtn}>
-                        <Text style={styles.tpSaveText}>Save</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
-    );
-};
 
 export default function CenterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [source, setSource] = useState('');
     const [destination, setDestination] = useState('');
+    const [sourceCoords, setSourceCoords] = useState<{ latitude: number, longitude: number } | null>(null);
+    const [destCoords, setDestCoords] = useState<{ latitude: number, longitude: number } | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [showTimePicker, setShowTimePicker] = useState(false);
@@ -221,6 +88,9 @@ export default function CenterScreen() {
         if (field === 'source') setSource(query);
         else setDestination(query);
 
+        // Clear error mapping when user starts typing
+        if (showError) setShowError(false);
+
         if (query.trim().length === 0) {
             setSuggestions([]);
             return;
@@ -232,7 +102,7 @@ export default function CenterScreen() {
         }
 
         try {
-            const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lat=20.5937&lon=78.9629&lang=en`);
+            const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
             const data = await response.json();
             setSuggestions(data.features || []);
         } catch (error) {
@@ -242,12 +112,19 @@ export default function CenterScreen() {
 
     const handleSelectSuggestion = (feature: any) => {
         const props = feature.properties;
+        const [lon, lat] = feature.geometry.coordinates;
+        const coords = { latitude: lat, longitude: lon };
         const name = props.name || props.city || props.street || '';
         const subtitle = [props.city, props.state, props.country].filter(Boolean).join(', ');
         const fullAddress = name + (subtitle ? (name ? ', ' : '') + subtitle : '');
 
-        if (activeField === 'source') setSource(fullAddress);
-        else setDestination(fullAddress);
+        if (activeField === 'source') {
+            setSource(fullAddress);
+            setSourceCoords(coords);
+        } else {
+            setDestination(fullAddress);
+            setDestCoords(coords);
+        }
 
         setSuggestions([]);
         setActiveField(null);
@@ -298,6 +175,12 @@ export default function CenterScreen() {
     const handleFind = () => {
         if (!source.trim() || !destination.trim()) {
             setShowError(true);
+
+            // Auto-reset error after 3 seconds
+            setTimeout(() => {
+                setShowError(false);
+            }, 3000);
+
             // Shake animation
             Animated.sequence([
                 Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
@@ -308,7 +191,17 @@ export default function CenterScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             return;
         }
-        router.back();
+
+        // Navigate to home tab with route info
+        router.push({
+            pathname: '/(tabs)',
+            params: {
+                routeSource: JSON.stringify(sourceCoords),
+                routeDest: JSON.stringify(destCoords),
+                sourceName: source,
+                destName: destination
+            }
+        });
     };
 
     return (
@@ -554,7 +447,7 @@ export default function CenterScreen() {
                                 </Svg>
                             </View>
                             <Text style={styles.inputText}>
-                                {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase()}
                             </Text>
                         </TouchableOpacity>
 
@@ -568,11 +461,25 @@ export default function CenterScreen() {
                     </View>
                 </ScrollView>
 
+                {showTimePicker && (
+                    <BlurView
+                        intensity={60}
+                        tint="regular"
+                        style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}
+                    />
+                )}
+
                 <TimePickerModal
                     visible={showTimePicker}
-                    initialDate={selectedDate}
-                    onClose={() => setShowTimePicker(false)}
-                    onSave={onTimeSave}
+                    onDismiss={() => setShowTimePicker(false)}
+                    onConfirm={({ hours, minutes }: { hours: number, minutes: number }) => {
+                        const newDate = new Date(selectedDate);
+                        newDate.setHours(hours);
+                        newDate.setMinutes(minutes);
+                        onTimeSave(newDate);
+                    }}
+                    hours={selectedDate.getHours()}
+                    minutes={selectedDate.getMinutes()}
                 />
             </View>
         </KeyboardAvoidingView>
@@ -673,7 +580,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     squareFill: {
-        width: 8,
+        width: '100%',
         backgroundColor: '#000',
     },
     inputsColumn: {
@@ -822,7 +729,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#FFF',
         height: 55,
-        borderRadius: 27.5,
+        borderRadius: 20,
         paddingHorizontal: 20,
         borderWidth: 1.5,
         borderColor: '#000',
@@ -863,91 +770,5 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontFamily: 'NicoMoji'
     },
-    tpOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.4)',
-    },
-    tpCard: {
-        width: width * 0.85,
-        backgroundColor: '#FFF',
-        borderRadius: 30,
-        padding: 24,
-        alignItems: 'center',
-    },
-    tpTitle: {
-        fontSize: 20,
-        fontWeight: '800',
-        marginBottom: 20,
-        color: '#000',
-    },
-    wheelsContainer: {
-        flexDirection: 'row',
-        height: WHEEL_ITEM_HEIGHT * 3,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    wheelWrapper: {
-        width: 60,
-        height: WHEEL_ITEM_HEIGHT * 3,
-    },
-    wheelItem: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    wheelItemText: {
-        fontSize: 22,
-        fontWeight: '700',
-    },
-    wheelItemTextActive: {
-        color: '#000',
-    },
-    wheelItemTextInactive: {
-        color: '#CCC',
-    },
-    separator: {
-        width: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    separatorText: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#000',
-    },
-    selectionHighlight: {
-        position: 'absolute',
-        height: WHEEL_ITEM_HEIGHT,
-        width: '100%',
-        backgroundColor: '#F5F5F5',
-        borderRadius: 10,
-        zIndex: -1,
-    },
-    tpFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginTop: 24,
-    },
-    tpCancelBtn: {
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-    },
-    tpCancelText: {
-        fontSize: 16,
-        color: '#AAA',
-        fontFamily: 'NicoMoji',
-    },
-    tpSaveBtn: {
-        backgroundColor: '#000',
-        borderRadius: 12,
-        paddingVertical: 10,
-        paddingHorizontal: 28,
-    },
-    tpSaveText: {
-        fontSize: 16,
-        color: '#FFF',
-        fontFamily: 'NicoMoji',
-    },
+
 });

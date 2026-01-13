@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [location, setLocation] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [source, setSource] = useState<any>(null);
   const [destination, setDestination] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -72,6 +73,7 @@ export default function HomeScreen() {
     setSearchQuery('');
     setSuggestions([]);
     setBoundary(null);
+    setSource(null);
     setDestination(null);
     setRouteCoordinates([]);
   };
@@ -136,12 +138,10 @@ export default function HomeScreen() {
     }
   };
 
-  const getRoute = async (destCoords: { latitude: number, longitude: number }) => {
-    if (!location) return;
-
+  const getRoute = async (start: { latitude: number, longitude: number }, end: { latitude: number, longitude: number }) => {
     try {
-      const startLoc = `${location.coords.longitude},${location.coords.latitude}`;
-      const endLoc = `${destCoords.longitude},${destCoords.latitude}`;
+      const startLoc = `${start.longitude},${start.latitude}`;
+      const endLoc = `${end.longitude},${end.latitude}`;
 
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${startLoc};${endLoc}?overview=full&geometries=geojson`
@@ -154,16 +154,18 @@ export default function HomeScreen() {
           longitude: coord[0],
         }));
         setRouteCoordinates(coords);
-        setDestination(destCoords);
+        setSource(start);
+        setDestination(end);
 
         // Fit map to show the whole route
         mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+          edgePadding: { top: 150, right: 80, bottom: 150, left: 80 },
           animated: true,
         });
       }
     } catch (error) {
       console.error('Error fetching route:', error);
+      Alert.alert("Route Error", "Could not calculate the route. Please try again.");
     }
   };
 
@@ -191,6 +193,7 @@ export default function HomeScreen() {
 
     // Reset current selection states
     setBoundary(null);
+    setSource(null);
     setDestination(null);
     setRouteCoordinates([]);
 
@@ -215,21 +218,32 @@ export default function HomeScreen() {
           const typeChar = type.charAt(0).toUpperCase();
           url = `https://nominatim.openstreetmap.org/lookup?osm_ids=${typeChar}${id}&format=json&polygon_geojson=1`;
         } else if (queryName) {
-          // Search for boundaries specifically
           url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryName)}&format=json&polygon_geojson=1&limit=3`;
         } else {
           return false;
         }
 
-        console.log('Fetching boundary from:', url);
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Sunside-Travel-App/1.0 (contact: user@example.com) React-Native-Fetch'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           }
         });
-        const data = await response.json();
 
+        if (!response.ok) {
+          console.warn(`Nominatim search failed status: ${response.status}`);
+          return false;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.warn('Nominatim returned non-JSON response');
+          return false;
+        }
+
+        const data = await response.json();
         let results = Array.isArray(data) ? data : [data];
+
+        if (results.length === 0) return false;
 
         // Find the result that is a boundary/polygon
         const bestResult = results.find((r: any) =>
@@ -252,7 +266,7 @@ export default function HomeScreen() {
         }
         return false;
       } catch (error: any) {
-        console.error('Error fetching boundary for URL:', url, error.message || error);
+        console.warn('Nominatim error suppressed:', error.message || error);
         return false;
       }
     };
@@ -339,6 +353,20 @@ export default function HomeScreen() {
     }
   }, [params.selectedPlace]);
 
+  useEffect(() => {
+    if (params.routeSource && params.routeDest) {
+      try {
+        const start = JSON.parse(params.routeSource as string);
+        const end = JSON.parse(params.routeDest as string);
+        if (start && end) {
+          getRoute(start, end);
+        }
+      } catch (e) {
+        console.error("Error parsing route params:", e);
+      }
+    }
+  }, [params.routeSource, params.routeDest]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -366,8 +394,72 @@ export default function HomeScreen() {
             strokeWidth={4}
           />
         )}
+        {source && (
+          <Marker
+            coordinate={source}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={{ alignItems: 'center', width: 40, height: 40 }}>
+              {/* Pin Head */}
+              <View style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: '#000',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {/* White Reflection Dot */}
+                <View style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 2.5,
+                  backgroundColor: '#FFF',
+                  position: 'absolute',
+                  top: 5,
+                  left: 5
+                }} />
+              </View>
+              {/* Pin Stick */}
+              <View style={{
+                width: 3,
+                height: 16,
+                backgroundColor: '#000',
+                marginTop: -1
+              }} />
+            </View>
+          </Marker>
+        )}
+
         {destination && (
-          <Marker coordinate={destination} title="Destination" />
+          <Marker
+            coordinate={destination}
+            anchor={{ x: 0.1, y: 1 }}
+          >
+            <View style={{ height: 40, width: 40, flexDirection: 'row', alignItems: 'flex-start' }}>
+              {/* Flagpole */}
+              <View style={{
+                width: 3,
+                height: 38,
+                backgroundColor: '#000',
+                borderRadius: 1.5
+              }} />
+              {/* Flag Triangle */}
+              <View style={{
+                width: 0,
+                height: 0,
+                backgroundColor: 'transparent',
+                borderStyle: 'solid',
+                borderLeftWidth: 22,
+                borderTopWidth: 11,
+                borderBottomWidth: 11,
+                borderLeftColor: '#000',
+                borderTopColor: 'transparent',
+                borderBottomColor: 'transparent',
+                marginTop: 2
+              }} />
+            </View>
+          </Marker>
         )}
 
         {boundary && boundary.type === 'Polygon' && (
