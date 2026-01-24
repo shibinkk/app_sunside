@@ -4,8 +4,9 @@ import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Polygon } from 'react-nativ
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Circle, G, Text as SvgText, Rect } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { analyzeSunExposure } from '../../utils/sunPath';
 
 const { width, height } = Dimensions.get('window');
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -36,12 +37,14 @@ export default function HomeScreen() {
   const [location, setLocation] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [sunStats, setSunStats] = useState<any>(null);
   const [source, setSource] = useState<any>(null);
   const [destination, setDestination] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [boundary, setBoundary] = useState<any>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [markerTracksViewChanges, setMarkerTracksViewChanges] = useState(true);
   const animatedHeading = useRef(new Animated.Value(0)).current;
   const locateScale = useRef(new Animated.Value(1)).current;
   const weatherScale = useRef(new Animated.Value(1)).current;
@@ -63,6 +66,16 @@ export default function HomeScreen() {
       loadingSpin.setValue(0);
     }
   }, [isLocating]);
+
+  useEffect(() => {
+    if (source || destination) {
+      setMarkerTracksViewChanges(true); // Allow render
+      const timer = setTimeout(() => {
+        setMarkerTracksViewChanges(false); // Stop updates (freeze)
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [source, destination]);
 
   const spin = loadingSpin.interpolate({
     inputRange: [0, 1],
@@ -112,8 +125,8 @@ export default function HomeScreen() {
         mapRef.current.animateToRegion({
           latitude: lastKnown.coords.latitude,
           longitude: lastKnown.coords.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
+          latitudeDelta: 0.010,
+          longitudeDelta: 0.010,
         }, 600); // Faster animation for instant feel
       }
 
@@ -127,8 +140,8 @@ export default function HomeScreen() {
         mapRef.current.animateToRegion({
           latitude: freshLocation.coords.latitude,
           longitude: freshLocation.coords.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.15, // Reduced zoom (increased delta)
+          longitudeDelta: 0.15,
         }, 1000);
       }
     } catch (error: any) {
@@ -154,6 +167,12 @@ export default function HomeScreen() {
           longitude: coord[0],
         }));
         setRouteCoordinates(coords);
+
+        // Calculate Sun Exposure
+        const tripDate = params.tripDate ? new Date(params.tripDate as string) : new Date();
+        const analysis = analyzeSunExposure(coords, tripDate);
+        setSunStats(analysis);
+
         setSource(start);
         setDestination(end);
 
@@ -177,9 +196,32 @@ export default function HomeScreen() {
     }
 
     try {
-      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+      // Prioritize Kerala/India by using a location bias
+      const biasLon = 76.2711;
+      const biasLat = 10.8505;
+
+      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=15&lat=${biasLat}&lon=${biasLon}`);
       const data = await response.json();
-      setSuggestions(data.features || []);
+
+      let features = data.features || [];
+
+      // Sort to prioritize cities and major places
+      features.sort((a: any, b: any) => {
+        const priorityOrder = ['city', 'town', 'municipality', 'village', 'state', 'district'];
+        const typeA = a.properties.osm_value;
+        const typeB = b.properties.osm_value;
+
+        const idxA = priorityOrder.indexOf(typeA);
+        const idxB = priorityOrder.indexOf(typeB);
+
+        // Calculate score: lower index is better. -1 means not in list (lowest priority)
+        const scoreA = idxA !== -1 ? idxA : 999;
+        const scoreB = idxB !== -1 ? idxB : 999;
+
+        return scoreA - scoreB;
+      });
+
+      setSuggestions(features.slice(0, 5));
     } catch (error) {
       console.error('Error searching places:', error);
     }
@@ -397,68 +439,43 @@ export default function HomeScreen() {
         {source && (
           <Marker
             coordinate={source}
-            anchor={{ x: 0.5, y: 1 }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={markerTracksViewChanges}
           >
-            <View style={{ alignItems: 'center', width: 40, height: 40 }}>
-              {/* Pin Head */}
-              <View style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: '#000',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}>
-                {/* White Reflection Dot */}
-                <View style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 2.5,
-                  backgroundColor: '#FFF',
-                  position: 'absolute',
-                  top: 5,
-                  left: 5
-                }} />
-              </View>
-              {/* Pin Stick */}
-              <View style={{
-                width: 3,
-                height: 16,
-                backgroundColor: '#000',
-                marginTop: -1
-              }} />
-            </View>
+            <View style={{
+              width: 20,
+              height: 20,
+              backgroundColor: '#FFFFFF',
+              borderWidth: 5,
+              borderColor: '#000000',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 3,
+              elevation: 5
+            }} />
           </Marker>
         )}
 
         {destination && (
           <Marker
             coordinate={destination}
-            anchor={{ x: 0.1, y: 1 }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={markerTracksViewChanges}
           >
-            <View style={{ height: 40, width: 40, flexDirection: 'row', alignItems: 'flex-start' }}>
-              {/* Flagpole */}
-              <View style={{
-                width: 3,
-                height: 38,
-                backgroundColor: '#000',
-                borderRadius: 1.5
-              }} />
-              {/* Flag Triangle */}
-              <View style={{
-                width: 0,
-                height: 0,
-                backgroundColor: 'transparent',
-                borderStyle: 'solid',
-                borderLeftWidth: 22,
-                borderTopWidth: 11,
-                borderBottomWidth: 11,
-                borderLeftColor: '#000',
-                borderTopColor: 'transparent',
-                borderBottomColor: 'transparent',
-                marginTop: 2
-              }} />
-            </View>
+            <View style={{
+              width: 20,
+              height: 20,
+              borderRadius: 10,
+              backgroundColor: '#FFFFFF',
+              borderWidth: 5,
+              borderColor: '#000000',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 3,
+              elevation: 5
+            }} />
           </Marker>
         )}
 
@@ -494,6 +511,7 @@ export default function HomeScreen() {
 
       {/* Header Search Bar Trigger */}
       <View style={styles.searchContainer}>
+        {/* ... existing search bar ... */}
         <TouchableOpacity
           style={styles.searchBar}
           activeOpacity={0.9}
@@ -514,6 +532,7 @@ export default function HomeScreen() {
               if (searchQuery.length > 0) {
                 e.stopPropagation();
                 clearSearch();
+                setSunStats(null); // Clear stats on reset
               }
             }}
           >
@@ -525,6 +544,41 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </View>
+
+      {/* Sun Stats Bottom Sheet */}
+      {sunStats && (
+        <Animated.View style={styles.sunStatsCard}>
+          <View style={styles.sunStatsHeader}>
+            <View>
+              <Text style={styles.sunStatsTitle}>Trip Analysis</Text>
+              <Text style={styles.sunStatsSubtitle}>Best side to avoid sun</Text>
+            </View>
+            <View style={styles.bestSideBadge}>
+              <Text style={styles.bestSideText}>{sunStats.bestSide === 'Left' ? 'LEFT' : sunStats.bestSide === 'Right' ? 'RIGHT' : 'ANY'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="resize" size={20} color="#666" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.statLabel}>Distance</Text>
+                <Text style={styles.statValue}>{sunStats.totalDistance} km</Text>
+              </View>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <Ionicons name="sunny" size={20} color="#FFA500" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.statLabel}>Sun Exposure</Text>
+                <Text style={styles.statValue}>{sunStats.sunExposurePercentage}%</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Floating Buttons */}
       <View style={styles.floatingButtons}>
@@ -694,7 +748,7 @@ const styles = StyleSheet.create({
   },
   floatingButtons: {
     position: 'absolute',
-    bottom: 120, // Space for Bottom Tab Bar
+    bottom: 240, // Increase bottom margin to clear the new card
     right: 20,
     gap: 15,
   },
@@ -710,5 +764,77 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 5,
+  },
+  sunStatsCard: {
+    position: 'absolute',
+    bottom: 95, // Above Tab Bar
+    left: 20,
+    right: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  sunStatsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sunStatsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+  sunStatsSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  bestSideBadge: {
+    backgroundColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  bestSideText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 15,
+  },
+  statItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 10,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000',
   },
 });

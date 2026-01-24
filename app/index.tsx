@@ -5,8 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
-// Use require for notifications to bypass common SDK 54 index resolution issues on Windows
-const Notifications = require('expo-notifications');
+
 
 export default function SplashScreen() {
     const router = useRouter();
@@ -23,6 +22,8 @@ export default function SplashScreen() {
 
             // Request Notifications - Handle Expo Go SDK 53+ limitations gracefully
             try {
+                // Defer requiring notifications to avoid global side-effects on import
+                const Notifications = require('expo-notifications');
                 if (Notifications && typeof Notifications.requestPermissionsAsync === 'function') {
                     await Notifications.requestPermissionsAsync();
                 }
