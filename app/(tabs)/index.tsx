@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView, Animated, Keyboard, PanResponder } from 'react-native';
+import LottieView from 'lottie-react-native';
 import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Polygon } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +11,29 @@ import { analyzeSunExposure } from '../../utils/sunPath';
 
 const { width, height } = Dimensions.get('window');
 const AnimatedG = Animated.createAnimatedComponent(G);
+
+const CustomMoonIcon = ({ size = 18 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 100 100">
+    <Circle cx="50" cy="50" r="48" fill="#1A2B48" />
+    <Circle cx="45" cy="55" r="28" fill="#F8E7B0" />
+    <Circle cx="35" cy="45" r="6" fill="#E8D790" opacity="0.4" />
+    <Circle cx="50" cy="65" r="4" fill="#E8D790" opacity="0.4" />
+    <Circle cx="72" cy="28" r="2" fill="#FFF" />
+    <Circle cx="60" cy="35" r="1.5" fill="#FFF" />
+    <Circle cx="82" cy="52" r="1.5" fill="#FFF" />
+  </Svg>
+);
+
+const CustomSunIcon = ({ size = 18 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 100 100">
+    <Circle cx="50" cy="50" r="48" fill="#5B9AFF" />
+    <Circle cx="25" cy="65" r="15" fill="#B0D4FF" />
+    <Circle cx="45" cy="72" r="18" fill="#D0E7FF" />
+    <Circle cx="60" cy="75" r="12" fill="#E8F4FF" />
+    <Circle cx="60" cy="40" r="25" fill="#FFB800" />
+    <Circle cx="60" cy="40" r="28" stroke="rgba(255, 184, 0, 0.2)" strokeWidth="3" fill="none" />
+  </Svg>
+);
 
 // Custom Uber-like Silver/Grey theme
 const mapStyle = [
@@ -57,6 +81,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const popupVisibility = useRef(new Animated.Value(0)).current;
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const rotationLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const panY = useRef(new Animated.Value(0)).current;
   const popupTranslateY = Animated.add(
@@ -76,15 +102,20 @@ export default function HomeScreen() {
   );
 
   const togglePopup = () => {
-    const toValue = isPopupExpanded ? 0 : 1;
-    setIsPopupExpanded(!isPopupExpanded);
-    isPopupExpandedRef.current = !isPopupExpanded;
-    Animated.spring(popupAnim, {
-      toValue,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 40
-    }).start();
+    setIsPopupExpanded(prev => {
+      const newVal = !prev;
+      isPopupExpandedRef.current = newVal;
+
+      const toValue = newVal ? 1 : 0;
+      Animated.spring(popupAnim, {
+        toValue,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 40
+      }).start();
+
+      return newVal;
+    });
   };
 
   const closeSunStats = () => {
@@ -191,7 +222,24 @@ export default function HomeScreen() {
           tension: 40
         })
       ]).start();
+
+      // Start rotation animation
+      rotationLoop.current = Animated.loop(
+        Animated.timing(rotationAnim, {
+          toValue: 1,
+          duration: 10000,
+          useNativeDriver: true,
+        })
+      );
+      rotationLoop.current.start();
+    } else {
+      rotationLoop.current?.stop();
+      rotationAnim.setValue(0);
     }
+
+    return () => {
+      rotationLoop.current?.stop();
+    };
   }, [sunStats]);
 
   const spin = loadingSpin.interpolate({
@@ -709,11 +757,29 @@ export default function HomeScreen() {
             <View style={styles.exposureRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {sunStats.leftSunPercentage === 0 ? (
-                  <Ionicons name="moon" size={18} color="#6F7E97" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 8 }}>
+                    <CustomMoonIcon size={20} />
+                  </View>
                 ) : sunStats.leftSunPercentage < 40 ? (
-                  <Ionicons name="partly-sunny" size={18} color="#FFC107" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 4 }}>
+                    <LottieView
+                      source={{ uri: 'https://lottie.host/0559f8f0-372e-4dcb-93b2-07edaa2c9fb0/cL4ybNEpIf.lottie' }}
+                      autoPlay
+                      loop
+                      style={{ width: 36, height: 36 }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 ) : (
-                  <Ionicons name="sunny" size={18} color="#FF8C00" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 4 }}>
+                    <LottieView
+                      source={{ uri: 'https://lottie.host/0559f8f0-372e-4dcb-93b2-07edaa2c9fb0/cL4ybNEpIf.lottie' }}
+                      autoPlay
+                      loop
+                      style={{ width: 36, height: 36 }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 )}
                 <Text style={styles.exposureLabel}>Left Side Sun:</Text>
               </View>
@@ -722,11 +788,29 @@ export default function HomeScreen() {
             <View style={styles.exposureRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {sunStats.rightSunPercentage === 0 ? (
-                  <Ionicons name="moon" size={18} color="#6F7E97" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 8 }}>
+                    <CustomMoonIcon size={20} />
+                  </View>
                 ) : sunStats.rightSunPercentage < 40 ? (
-                  <Ionicons name="partly-sunny" size={18} color="#FFC107" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 4 }}>
+                    <LottieView
+                      source={{ uri: 'https://lottie.host/0559f8f0-372e-4dcb-93b2-07edaa2c9fb0/cL4ybNEpIf.lottie' }}
+                      autoPlay
+                      loop
+                      style={{ width: 36, height: 36 }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 ) : (
-                  <Ionicons name="sunny" size={18} color="#FF8C00" style={{ marginRight: 8 }} />
+                  <View style={{ marginRight: 4 }}>
+                    <LottieView
+                      source={{ uri: 'https://lottie.host/0559f8f0-372e-4dcb-93b2-07edaa2c9fb0/cL4ybNEpIf.lottie' }}
+                      autoPlay
+                      loop
+                      style={{ width: 36, height: 36 }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 )}
                 <Text style={styles.exposureLabel}>Right Side Sun:</Text>
               </View>
@@ -756,7 +840,18 @@ export default function HomeScreen() {
             <View style={styles.statDivider} />
 
             <View style={styles.statItem}>
-              <Ionicons name="sunny" size={18} color="#FFA500" />
+              <Animated.View style={{
+                transform: [
+                  {
+                    rotate: rotationAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg']
+                    })
+                  }
+                ]
+              }}>
+                <Ionicons name="sunny" size={18} color="#FFA500" />
+              </Animated.View>
               <View style={{ marginLeft: 5 }}>
                 <Text style={styles.statLabel}>Exposure</Text>
                 <Text style={styles.statValue} numberOfLines={1}>{sunStats.sunExposurePercentage}%</Text>
@@ -1034,15 +1129,16 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   exposureDetails: {
-    marginBottom: 20,
+    marginBottom: 15,
     backgroundColor: '#F8F9FA',
     borderRadius: 16,
-    padding: 15,
+    padding: 10,
   },
   exposureRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   exposureLabel: {
     fontSize: 14,
