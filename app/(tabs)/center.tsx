@@ -218,7 +218,8 @@ export default function CenterScreen() {
                 routeDest: JSON.stringify(destCoords),
                 sourceName: source,
                 destName: destination,
-                tripDate: selectedDate.toISOString()
+                tripDate: selectedDate.toISOString(),
+                t: Date.now().toString(), // Force re-trigger in HomeScreen
             }
         });
     };

@@ -11,6 +11,8 @@ interface SunAnalysisResult {
     leftSunDistance: number; // km where sun is on the left
     rightSunDistance: number; // km where sun is on the right
     bestSide: 'Left' | 'Right' | 'Any';
+    leftSunPercentage: number;
+    rightSunPercentage: number;
     sunExposurePercentage: number;
 }
 
@@ -51,6 +53,8 @@ export const analyzeSunExposure = (coordinates: Coordinate[], date: Date = new D
             totalDistance: 0,
             leftSunDistance: 0,
             rightSunDistance: 0,
+            leftSunPercentage: 0,
+            rightSunPercentage: 0,
             bestSide: 'Any',
             sunExposurePercentage: 0
         };
@@ -111,13 +115,16 @@ export const analyzeSunExposure = (coordinates: Coordinate[], date: Date = new D
         bestSide = 'Left'; // Sun on right, sit left
     }
 
-    const maxSunDist = Math.max(leftSunDist, rightSunDist);
-    const sunPercentage = totalDist > 0 ? (maxSunDist / totalDist) * 100 : 0;
+    const leftSunPercentage = totalDist > 0 ? (leftSunDist / totalDist) * 100 : 0;
+    const rightSunPercentage = totalDist > 0 ? (rightSunDist / totalDist) * 100 : 0;
+    const sunPercentage = totalDist > 0 ? ((leftSunDist + rightSunDist) / totalDist) * 100 : 0;
 
     return {
-        totalDistance: parseFloat(totalDist.toFixed(2)),
-        leftSunDistance: parseFloat(leftSunDist.toFixed(2)),
-        rightSunDistance: parseFloat(rightSunDist.toFixed(2)),
+        totalDistance: parseFloat(totalDist.toFixed(1)),
+        leftSunDistance: parseFloat(leftSunDist.toFixed(1)),
+        rightSunDistance: parseFloat(rightSunDist.toFixed(1)),
+        leftSunPercentage: Math.round(leftSunPercentage),
+        rightSunPercentage: Math.round(rightSunPercentage),
         bestSide,
         sunExposurePercentage: Math.round(sunPercentage)
     };

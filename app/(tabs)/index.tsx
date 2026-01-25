@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView, Animated, Keyboard } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Dimensions, Text, Alert, Linking, Platform, ScrollView, Animated, Keyboard, PanResponder } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Polygon } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
@@ -44,7 +44,11 @@ export default function HomeScreen() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [boundary, setBoundary] = useState<any>(null);
   const [isLocating, setIsLocating] = useState(false);
+
   const [markerTracksViewChanges, setMarkerTracksViewChanges] = useState(true);
+  const [isPopupExpanded, setIsPopupExpanded] = useState(true);
+  const isPopupExpandedRef = useRef(true);
+  const popupAnim = useRef(new Animated.Value(1)).current;
   const animatedHeading = useRef(new Animated.Value(0)).current;
   const locateScale = useRef(new Animated.Value(1)).current;
   const weatherScale = useRef(new Animated.Value(1)).current;
@@ -52,6 +56,93 @@ export default function HomeScreen() {
   const loadingSpin = useRef(new Animated.Value(0)).current;
   const router = useRouter();
   const params = useLocalSearchParams();
+  const popupVisibility = useRef(new Animated.Value(0)).current;
+
+  const panY = useRef(new Animated.Value(0)).current;
+  const popupTranslateY = Animated.add(
+    popupAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [200, 0]
+    }),
+    panY
+  );
+
+  const buttonsTranslateY = Animated.multiply(
+    popupVisibility,
+    popupAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-150, -290]
+    })
+  );
+
+  const togglePopup = () => {
+    const toValue = isPopupExpanded ? 0 : 1;
+    setIsPopupExpanded(!isPopupExpanded);
+    isPopupExpandedRef.current = !isPopupExpanded;
+    Animated.spring(popupAnim, {
+      toValue,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40
+    }).start();
+  };
+
+  const closeSunStats = () => {
+    Animated.parallel([
+      Animated.timing(panY, {
+        toValue: 600,
+        duration: 350,
+        useNativeDriver: true
+      }),
+      Animated.timing(popupVisibility, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true
+      })
+    ]).start(() => {
+      setSunStats(null);
+      panY.setValue(0);
+      popupAnim.setValue(1);
+      setIsPopupExpanded(true);
+      isPopupExpandedRef.current = true;
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 10,
+      onPanResponderMove: (_, gestureState) => {
+        // Resistance when dragging up while expanded
+        if (gestureState.dy < 0 && isPopupExpandedRef.current) {
+          panY.setValue(gestureState.dy * 0.3);
+        } else {
+          panY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 60 || gestureState.vy > 0.4) {
+          // Swiped down
+          if (isPopupExpandedRef.current) {
+            togglePopup();
+            Animated.spring(panY, { toValue: 0, useNativeDriver: true }).start();
+          } else {
+            // Collapse -> Completely close
+            closeSunStats();
+          }
+        } else if (gestureState.dy < -60 || gestureState.vy < -0.4) {
+          // Swiped up
+          if (!isPopupExpandedRef.current) {
+            togglePopup();
+          }
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true }).start();
+        } else {
+          // Just snap back
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      }
+    })
+  ).current;
 
   useEffect(() => {
     if (isLocating) {
@@ -77,6 +168,32 @@ export default function HomeScreen() {
     }
   }, [source, destination]);
 
+  useEffect(() => {
+    if (sunStats) {
+      setIsPopupExpanded(true);
+      isPopupExpandedRef.current = true;
+
+      // Reset to slide up from bottom
+      panY.setValue(300);
+      popupAnim.setValue(1);
+
+      Animated.parallel([
+        Animated.spring(panY, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 30
+        }),
+        Animated.spring(popupVisibility, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 8,
+          tension: 40
+        })
+      ]).start();
+    }
+  }, [sunStats]);
+
   const spin = loadingSpin.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -89,6 +206,9 @@ export default function HomeScreen() {
     setSource(null);
     setDestination(null);
     setRouteCoordinates([]);
+    if (sunStats) {
+      closeSunStats();
+    }
   };
 
   const getLocation = async () => {
@@ -171,7 +291,15 @@ export default function HomeScreen() {
         // Calculate Sun Exposure
         const tripDate = params.tripDate ? new Date(params.tripDate as string) : new Date();
         const analysis = analyzeSunExposure(coords, tripDate);
-        setSunStats(analysis);
+
+        // Get travel time from OSRM (seconds to minutes/hours)
+        const durationSeconds = data.routes[0].duration;
+        const totalMinutes = Math.round(durationSeconds / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+        setSunStats({ ...analysis, averageTime: timeStr });
 
         setSource(start);
         setDestination(end);
@@ -407,7 +535,7 @@ export default function HomeScreen() {
         console.error("Error parsing route params:", e);
       }
     }
-  }, [params.routeSource, params.routeDest]);
+  }, [params.routeSource, params.routeDest, params.tripDate, params.t]);
 
   return (
     <View style={styles.container}>
@@ -532,7 +660,6 @@ export default function HomeScreen() {
               if (searchQuery.length > 0) {
                 e.stopPropagation();
                 clearSearch();
-                setSunStats(null); // Clear stats on reset
               }
             }}
           >
@@ -547,7 +674,26 @@ export default function HomeScreen() {
 
       {/* Sun Stats Bottom Sheet */}
       {sunStats && (
-        <Animated.View style={styles.sunStatsCard}>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.sunStatsCard,
+            {
+              transform: [{ translateY: popupTranslateY }],
+              opacity: popupVisibility.interpolate({
+                inputRange: [0, 0.1, 1],
+                outputRange: [0, 1, 1]
+              })
+            }
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={togglePopup}
+            style={styles.popupHandleArea}
+          >
+            <View style={styles.popupHandleBar} />
+          </TouchableOpacity>
           <View style={styles.sunStatsHeader}>
             <View>
               <Text style={styles.sunStatsTitle}>Trip Analysis</Text>
@@ -558,22 +704,62 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* Detailed Side Analysis */}
+          <View style={styles.exposureDetails}>
+            <View style={styles.exposureRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {sunStats.leftSunPercentage === 0 ? (
+                  <Ionicons name="moon" size={18} color="#6F7E97" style={{ marginRight: 8 }} />
+                ) : sunStats.leftSunPercentage < 40 ? (
+                  <Ionicons name="partly-sunny" size={18} color="#FFC107" style={{ marginRight: 8 }} />
+                ) : (
+                  <Ionicons name="sunny" size={18} color="#FF8C00" style={{ marginRight: 8 }} />
+                )}
+                <Text style={styles.exposureLabel}>Left Side Sun:</Text>
+              </View>
+              <Text style={styles.exposureValue}>{sunStats.leftSunPercentage}%</Text>
+            </View>
+            <View style={styles.exposureRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {sunStats.rightSunPercentage === 0 ? (
+                  <Ionicons name="moon" size={18} color="#6F7E97" style={{ marginRight: 8 }} />
+                ) : sunStats.rightSunPercentage < 40 ? (
+                  <Ionicons name="partly-sunny" size={18} color="#FFC107" style={{ marginRight: 8 }} />
+                ) : (
+                  <Ionicons name="sunny" size={18} color="#FF8C00" style={{ marginRight: 8 }} />
+                )}
+                <Text style={styles.exposureLabel}>Right Side Sun:</Text>
+              </View>
+              <Text style={styles.exposureValue}>{sunStats.rightSunPercentage}%</Text>
+            </View>
+          </View>
+
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Ionicons name="resize" size={20} color="#666" />
-              <View style={{ marginLeft: 8 }}>
+              <Ionicons name="resize" size={18} color="#666" />
+              <View style={{ marginLeft: 5 }}>
                 <Text style={styles.statLabel}>Distance</Text>
-                <Text style={styles.statValue}>{sunStats.totalDistance} km</Text>
+                <Text style={styles.statValue} numberOfLines={1}>{sunStats.totalDistance} km</Text>
               </View>
             </View>
 
             <View style={styles.statDivider} />
 
             <View style={styles.statItem}>
-              <Ionicons name="sunny" size={20} color="#FFA500" />
-              <View style={{ marginLeft: 8 }}>
-                <Text style={styles.statLabel}>Sun Exposure</Text>
-                <Text style={styles.statValue}>{sunStats.sunExposurePercentage}%</Text>
+              <Ionicons name="time-outline" size={18} color="#666" />
+              <View style={{ marginLeft: 5 }}>
+                <Text style={styles.statLabel}>Time</Text>
+                <Text style={styles.statValue} numberOfLines={1}>{sunStats.averageTime}</Text>
+              </View>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <Ionicons name="sunny" size={18} color="#FFA500" />
+              <View style={{ marginLeft: 5 }}>
+                <Text style={styles.statLabel}>Exposure</Text>
+                <Text style={styles.statValue} numberOfLines={1}>{sunStats.sunExposurePercentage}%</Text>
               </View>
             </View>
           </View>
@@ -581,7 +767,12 @@ export default function HomeScreen() {
       )}
 
       {/* Floating Buttons */}
-      <View style={styles.floatingButtons}>
+      <Animated.View
+        style={[
+          styles.floatingButtons,
+          { transform: [{ translateY: buttonsTranslateY }] }
+        ]}
+      >
         <TouchableOpacity style={styles.floatingButton} onPress={resetOrientation}>
           <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             {/* Background Dial */}
@@ -666,7 +857,7 @@ export default function HomeScreen() {
             </Svg>
           </Animated.View>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -748,9 +939,10 @@ const styles = StyleSheet.create({
   },
   floatingButtons: {
     position: 'absolute',
-    bottom: 240, // Increase bottom margin to clear the new card
+    bottom: 110, // Default Position (Lower)
     right: 20,
     gap: 15,
+    zIndex: 15, // Ensure buttons are above the popup
   },
   floatingButton: {
     width: 56,
@@ -767,7 +959,7 @@ const styles = StyleSheet.create({
   },
   sunStatsCard: {
     position: 'absolute',
-    bottom: 95, // Above Tab Bar
+    bottom: 95, // Reverted to bottom position
     left: 20,
     right: 20,
     backgroundColor: '#FFF',
@@ -778,6 +970,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 8,
+    zIndex: 10, // Ensure popup is above buttons
   },
   sunStatsHeader: {
     flexDirection: 'row',
@@ -810,31 +1003,69 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center', // Added to center all items
     backgroundColor: '#F8F9FA',
     borderRadius: 16,
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 10,
   },
   statItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center', // Added to center content within item
+    paddingHorizontal: 2,
   },
   statDivider: {
     width: 1,
-    height: 30,
+    height: 25,
     backgroundColor: '#E0E0E0',
-    marginHorizontal: 10,
+    marginHorizontal: 5,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#999',
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   statValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: '#000',
+  },
+  exposureDetails: {
+    marginBottom: 20,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 15,
+  },
+  exposureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  exposureLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  exposureValue: {
+    fontSize: 14,
+    color: '#000',
+    fontWeight: '700',
+  },
+  popupHandleArea: {
+    width: '100%',
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -10,
+    marginBottom: 5,
+  },
+  popupHandleBar: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E0E0E0',
   },
 });
