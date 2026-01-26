@@ -95,10 +95,13 @@ export default function HomeScreen() {
 
   const buttonsTranslateY = Animated.multiply(
     popupVisibility,
-    popupAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-150, -290]
-    })
+    Animated.add(
+      panY,
+      popupAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-105, -290]
+      })
+    )
   );
 
   const togglePopup = () => {
@@ -527,10 +530,9 @@ export default function HomeScreen() {
         friction: 4,
         useNativeDriver: true,
       }),
-    ]).start();
-
-    // Optional: Add weather logic here later
-    Alert.alert("Weather", "Checking daily forecast...");
+    ]).start(() => {
+      router.push('/weather');
+    });
   };
 
   const updateHeading = async () => {
