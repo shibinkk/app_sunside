@@ -255,6 +255,7 @@ export default function WeatherScreen() {
 
     const fetchWeather = async () => {
         try {
+            setWeatherData(null);
             setLoading(true);
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
@@ -284,19 +285,28 @@ export default function WeatherScreen() {
 
     if (loading || !weatherData) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#FFB800" />
-                <Text style={{ marginTop: 10, color: '#64748B', fontWeight: '600' }}>Fetching Weather...</Text>
+            <View style={styles.loadingContainer}>
+                <LottieView
+                    source={{ uri: 'https://lottie.host/ba48844f-e27e-4e3e-a60f-3988168870fd/kAe0jlmsvN.lottie' }}
+                    autoPlay
+                    loop
+                    style={styles.loadingLottie}
+                />
+                <Text style={styles.loadingText}>Fetching Weather...</Text>
             </View>
         );
     }
 
     const current = weatherData.current;
-    const nextHours = weatherData.hourly.time.slice(0, 12).map((time: string, index: number) => ({
-        time: new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-        temp: `${Math.round(weatherData.hourly.temperature_2m[index])}°`,
-        weatherCode: weatherData.hourly.weather_code[index],
-    }));
+    const nextHourIndex = weatherData.hourly.time.findIndex((t: string) => new Date(t) > new Date());
+    const nextHours = weatherData.hourly.time.slice(nextHourIndex, nextHourIndex + 12).map((time: string, index: number) => {
+        const dataIndex = nextHourIndex + index;
+        return {
+            time: new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }),
+            temp: `${Math.round(weatherData.hourly.temperature_2m[dataIndex])}°`,
+            weatherCode: weatherData.hourly.weather_code[dataIndex],
+        };
+    });
 
     return (
         <View style={styles.container}>
@@ -315,9 +325,18 @@ export default function WeatherScreen() {
                     <View style={styles.locationContainer}><Ionicons name="location" size={14} color="#FFB800" /><Text style={styles.locationText}>{locationName.city}, {locationName.country}</Text></View>
                 </View>
                 <View style={styles.miniStatsRow}>
-                    <View style={styles.miniStatItem}><LottieView source={getWeatherLottieSource(current.weather_code)} autoPlay loop style={{ width: 26, height: 26 }} /><Text style={styles.miniStatText}>{getWeatherCondition(current.weather_code)}</Text></View>
-                    <View style={styles.miniStatItem}><LottieView source={windLottieSource} autoPlay loop style={{ width: 26, height: 26 }} /><Text style={styles.miniStatText}>{Math.round(current.wind_speed_10m)}km/h</Text></View>
-                    <View style={styles.miniStatItem}><LottieView source={humidityLottieSource} autoPlay loop style={{ width: 26, height: 26 }} /><Text style={styles.miniStatText}>{current.relative_humidity_2m}%</Text></View>
+                    <View style={[styles.miniStatItem, { flex: 1.6 }]}>
+                        <LottieView source={getWeatherLottieSource(current.weather_code)} autoPlay loop style={{ width: 22, height: 22 }} />
+                        <Text style={styles.miniStatText} numberOfLines={1}>{getWeatherCondition(current.weather_code)}</Text>
+                    </View>
+                    <View style={styles.miniStatItem}>
+                        <LottieView source={windLottieSource} autoPlay loop style={{ width: 22, height: 22 }} />
+                        <Text style={styles.miniStatText} numberOfLines={1}>{Math.round(current.wind_speed_10m)}k/h</Text>
+                    </View>
+                    <View style={styles.miniStatItem}>
+                        <Ionicons name="water" size={18} color="#3B82F6" style={{ marginRight: 4 }} />
+                        <Text style={styles.miniStatText} numberOfLines={1}>{current.relative_humidity_2m}%</Text>
+                    </View>
                 </View>
                 <View style={styles.hourlyHeader}><Text style={styles.hourlyTitle}>Today</Text><TouchableOpacity style={styles.next15Btn}><Text style={styles.next15Text}>Next 15 days</Text><Ionicons name="chevron-forward" size={12} color="#FFB800" /></TouchableOpacity></View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hourlyList}>
@@ -352,6 +371,9 @@ export default function WeatherScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
+    loadingContainer: { flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', },
+    loadingLottie: { width: 300, height: 300 },
+    loadingText: { marginTop: -20, color: '#64748B', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
     header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
     headerBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: 18 },
     scrollContent: { paddingBottom: 40 },
@@ -369,9 +391,9 @@ const styles = StyleSheet.create({
     iconWrap: { alignItems: 'center', justifyContent: 'center' },
     locationContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
     locationText: { color: '#64748B', marginLeft: 4, fontSize: 11, fontWeight: '600' },
-    miniStatsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 12, marginVertical: 10 },
-    miniStatItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
-    miniStatText: { color: '#000000ff', marginLeft: 6, fontSize: 14, fontWeight: '700' },
+    miniStatsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginVertical: 10, gap: 8 },
+    miniStatItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 6, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9' },
+    miniStatText: { color: '#0F172A', marginLeft: 4, fontSize: 12, fontWeight: '800' },
     hourlyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginTop: 8 },
     hourlyTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
     next15Btn: { flexDirection: 'row', alignItems: 'center' },
@@ -383,11 +405,11 @@ const styles = StyleSheet.create({
     overviewContainer: { margin: 12, backgroundColor: '#FFFFFF', borderRadius: 24, paddingVertical: 20, paddingHorizontal: 12, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#64748B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
     overviewTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     overviewTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B' },
-    tabContainer: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 20, padding: 5 },
+    tabContainer: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 20, padding: 4 },
     tabBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 7, borderRadius: 16 },
     tabBtnActive: { backgroundColor: '#FFFFFF', shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
     tabText: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#94A3B8',
         fontWeight: '600',
     },
