@@ -14,7 +14,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { API_URL } from '../../constants/Config';
 import { ActivityIndicator } from 'react-native';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -22,7 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { showToast } = useToast();
-  const { signIn } = useAuth();
+  const { user } = useAuth();
   const { height: screenHeight } = useWindowDimensions();
 
 
@@ -51,30 +50,26 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      const { signIn: firebaseSignIn } = require('../../config/authHelper');
+      const user = await firebaseSignIn(email, password);
 
-      const data = await response.json();
-
-      if (response.ok) {
-        await signIn(data.token, data.user);
-        showToast('Login successful!', 'success');
-        router.replace('/(tabs)');
-      } else {
-        showToast(data.message || 'Invalid email or password', 'error');
+      if (!user.emailVerified) {
+        const { auth } = require('../../config/firebase');
+        await auth.signOut();
+        showToast('Please verify your email before logging in.', 'error');
+        return;
       }
 
-    } catch (error) {
+      showToast('Login successful!', 'success');
+      router.replace('/(tabs)');
+    } catch (error: any) {
       console.error('Login Error:', error);
-      showToast('Could not connect to the server', 'error');
+      let message = 'Invalid email or password';
+      if (error.code === 'auth/user-not-found') message = 'No user found with this email';
+      if (error.code === 'auth/wrong-password') message = 'Incorrect password';
+      if (error.code === 'auth/network-request-failed') message = 'Network error. Check your connection';
+
+      showToast(message, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -186,11 +181,27 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <>
-                <Text style={styles.nextButtonText}>Login</Text>
-              </>
+              <Text style={styles.nextButtonText}>Login</Text>
             )}
           </TouchableOpacity>
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>Or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.socialContainer}>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="logo-google" size={24} color="#DB4437" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="logo-facebook" size={24} color="#4267B2" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="logo-apple" size={24} color="#000000" />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>New member ? </Text>
@@ -302,5 +313,41 @@ const styles = StyleSheet.create({
     color: '#FF3951',
     fontSize: 14,
     fontWeight: '600',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 30,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  dividerText: {
+    marginHorizontal: 15,
+    color: '#999',
+    fontSize: 14,
+  },
+  socialContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 40,
+  },
+  socialButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 });

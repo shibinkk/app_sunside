@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    onAuthStateChanged,
+    User as FirebaseUser,
+    signOut as firebaseSignOut
+} from 'firebase/auth';
+import { auth } from '../config/firebase';
 
 interface User {
     id: string;
-    name: string;
-    email: string;
+    name: string | null;
+    email: string | null;
 }
 
 interface AuthContextType {
     user: User | null;
-    token: string | null;
     isLoading: boolean;
-    signIn: (token: string, user: User) => Promise<void>;
     signOut: () => Promise<void>;
 }
 
@@ -19,54 +22,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Load persisted data on mount
-        const loadStorageData = async () => {
-            try {
-                const storedToken = await AsyncStorage.getItem('userToken');
-                const storedUser = await AsyncStorage.getItem('userData');
-
-                if (storedToken && storedUser) {
-                    setToken(storedToken);
-                    setUser(JSON.parse(storedUser));
-                }
-            } catch (e) {
-                console.error('Failed to load storage data:', e);
-            } finally {
-                setIsLoading(false);
+        // Subscribe to auth state changes
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                setUser({
+                    id: firebaseUser.uid,
+                    name: firebaseUser.displayName,
+                    email: firebaseUser.email,
+                });
+            } else {
+                setUser(null);
             }
-        };
+            setIsLoading(false);
+        });
 
-        loadStorageData();
+        // Cleanup subscription
+        return () => unsubscribe();
     }, []);
-
-    const signIn = async (newToken: string, newUser: User) => {
-        try {
-            await AsyncStorage.setItem('userToken', newToken);
-            await AsyncStorage.setItem('userData', JSON.stringify(newUser));
-            setToken(newToken);
-            setUser(newUser);
-        } catch (e) {
-            console.error('Failed to save sign-in data:', e);
-        }
-    };
 
     const signOut = async () => {
         try {
-            await AsyncStorage.removeItem('userToken');
-            await AsyncStorage.removeItem('userData');
-            setToken(null);
-            setUser(null);
+            await firebaseSignOut(auth);
         } catch (e) {
-            console.error('Failed to clear stored data:', e);
+            console.error('Failed to sign out:', e);
         }
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, isLoading, signOut }}>
             {children}
         </AuthContext.Provider>
     );

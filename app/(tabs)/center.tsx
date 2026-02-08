@@ -14,6 +14,7 @@ import {
     KeyboardAvoidingView,
     ImageBackground,
     Image,
+    PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, G, Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
@@ -48,44 +49,46 @@ export default function CenterScreen() {
     const [activeField, setActiveField] = useState<'source' | 'destination' | null>(null);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    const sourceAnim = useRef(new Animated.Value(0)).current;
-    const destAnim = useRef(new Animated.Value(0)).current;
+    const [stackIndex, setStackIndex] = useState(0);
+    const swipeAnim = useRef(new Animated.Value(0)).current;
+
+    const trips = useMemo(() => [
+        { id: 1, operator: 'BUSY TRAVEL', time: '2 min ago', user: 'Sarah', message: 'Hey, fancy a trip to Kochi?', icon: 'person', from: 'Kochi', to: 'Bangalore' },
+        { id: 2, operator: 'SUNSIDE', time: '15 min ago', user: 'System', message: 'Your booking for Trivandrum is confirmed 🎉', icon: 'notifications', from: 'Trivandrum', to: 'Chennai' },
+        { id: 3, operator: 'VOLVO EXPRESS', time: '1h ago', user: 'Driver', message: 'I am arriving at the pickup point soon.', icon: 'bus', from: 'Calicut', to: 'Mangalore' },
+        { id: 4, operator: 'METRO LINK', time: '2h ago', user: 'Office', message: 'Check your updated schedule for tomorrow.', icon: 'calendar', from: 'Ernakulam', to: 'Aluva' },
+    ], []);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
+            onPanResponderMove: (_, gesture) => {
+                if (gesture.dy < 0) swipeAnim.setValue(gesture.dy);
+            },
+            onPanResponderRelease: (_, gesture) => {
+                if (gesture.dy < -50) {
+                    Animated.timing(swipeAnim, {
+                        toValue: -200,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        setStackIndex((prev) => (prev + 1) % trips.length);
+                        swipeAnim.setValue(0);
+                    });
+                } else {
+                    Animated.spring(swipeAnim, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
     const shakeAnim = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
 
     const isFormValid = source.trim().length > 0 && destination.trim().length > 0;
-
-    useEffect(() => {
-        const today = new Date();
-        setSelectedDate(today);
-        setCurrentMonth(today);
-
-        const timer = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-
-        setTimeout(() => {
-            centerDate(today);
-        }, 500);
-
-        return () => clearInterval(timer);
-    }, []);
-
-    useEffect(() => {
-        Animated.timing(sourceAnim, {
-            toValue: source.length > 0 ? 1 : 0,
-            duration: 400,
-            useNativeDriver: false,
-        }).start();
-    }, [source]);
-
-    useEffect(() => {
-        Animated.timing(destAnim, {
-            toValue: destination.length > 0 ? 1 : 0,
-            duration: 400,
-            useNativeDriver: false,
-        }).start();
-    }, [destination]);
 
 
     const searchPlaces = async (query: string, field: 'source' | 'destination') => {
@@ -229,155 +232,208 @@ export default function CenterScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1, backgroundColor: '#FAFAFA' }}
         >
-            <View style={styles.container}>
-                <ImageBackground
-                    source={require('../../assets/images/adventure_illustration.png')}
-                    style={[styles.headerBg, { paddingTop: insets.top }]}
-                    imageStyle={styles.headerImage}
-                    resizeMode="contain"
-                >
-                    <View style={styles.headerContent}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.circleBackButton}>
-                            <Ionicons name="arrow-back" size={24} color="#000" />
-                        </TouchableOpacity>
-                        <Text style={styles.pageTitleHeader}>Find Your Trip</Text>
-                        <View style={{ width: 45 }} />
-                    </View>
+            <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
+                <View style={styles.compactHeader}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtnCircle}>
+                        <Ionicons name="arrow-back" size={24} color="#000" />
+                    </TouchableOpacity>
+                    <Text style={styles.compactHeaderTitle}>Start your journey</Text>
+                    <TouchableOpacity style={styles.notificationBtn}>
+                        <Ionicons name="notifications-outline" size={22} color="#000" />
+                    </TouchableOpacity>
+                </View>
 
-                    {/* Gradient Overlay for mixing effect */}
-                    <View style={styles.gradientOverlay}>
-                        <Svg height="120" width="100%">
-                            <Defs>
-                                <SvgLinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                                    <Stop offset="0" stopColor="#FAFAF8" stopOpacity="0" />
-                                    <Stop offset="1" stopColor="#FAFAF8" stopOpacity="1" />
-                                </SvgLinearGradient>
-                            </Defs>
-                            <Rect x="0" y="0" width="100%" height="120" fill="url(#grad)" />
-                        </Svg>
-                    </View>
-                </ImageBackground>
+                <View style={styles.contentView}>
 
-                <ScrollView
-                    style={styles.content}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <Animated.View style={[
-                        styles.routeCard,
-                        { transform: [{ translateX: shakeAnim }] }
-                    ]}>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>FROM</Text>
-                            <View style={styles.inputPill}>
-                                <Ionicons name="locate" size={20} color="#000" style={styles.inputIcon} />
-                                <TextInput
-                                    placeholder="Enter source place"
-                                    style={styles.locationInput}
-                                    value={source}
-                                    onChangeText={(text) => searchPlaces(text, 'source')}
-                                    onFocus={() => setActiveField('source')}
-                                    placeholderTextColor="#999"
-                                />
-                                {source.length > 0 && (
-                                    <TouchableOpacity onPress={() => searchPlaces('', 'source')} style={styles.clearBtn}>
-                                        <Ionicons name="close-circle" size={18} color="#CCC" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>TO</Text>
-                            <View style={styles.inputPill}>
-                                <Ionicons name="map" size={18} color="#000" style={styles.inputIcon} />
-                                <TextInput
-                                    placeholder="City, Station..."
-                                    style={styles.locationInput}
-                                    value={destination}
-                                    onChangeText={(text) => searchPlaces(text, 'destination')}
-                                    onFocus={() => setActiveField('destination')}
-                                    placeholderTextColor="#999"
-                                />
-                                {destination.length > 0 && (
-                                    <TouchableOpacity onPress={() => searchPlaces('', 'destination')} style={styles.clearBtn}>
-                                        <Ionicons name="close-circle" size={18} color="#CCC" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
 
-                        <TouchableOpacity onPress={handleSwap} style={styles.swapBtnBlack} activeOpacity={0.8}>
-                            <Ionicons name="swap-vertical" size={18} color="#FFF" />
-                        </TouchableOpacity>
-                    </Animated.View>
-
-                    {activeField && suggestions.length > 0 && (
-                        <View style={styles.suggestionsWrapper}>
-                            {suggestions.map((item, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    style={styles.suggestionItem}
-                                    onPress={() => handleSelectSuggestion(item)}
-                                >
-                                    <View style={styles.locIconBg}>
-                                        <Ionicons name="location" size={16} color="#666" />
+                    <View style={styles.mainFormContainer}>
+                        <Animated.View style={[
+                            styles.routeSection,
+                            { transform: [{ translateX: shakeAnim }] }
+                        ]}>
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.outsideLabel}>From</Text>
+                                <View style={styles.inputPill}>
+                                    <Ionicons name="location" size={18} color="#000" style={styles.inputIcon} />
+                                    <View style={styles.inputTextWrapper}>
+                                        <TextInput
+                                            style={styles.locationInput}
+                                            value={source}
+                                            placeholder="Enter source"
+                                            placeholderTextColor="#999"
+                                            onChangeText={(text) => searchPlaces(text, 'source')}
+                                            onFocus={() => setActiveField('source')}
+                                            onBlur={() => setActiveField(null)}
+                                        />
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.suggestionTitle} numberOfLines={1}>
-                                            {item.properties.name || item.properties.city || item.properties.street}
-                                        </Text>
-                                        <Text style={styles.suggestionSubtitle} numberOfLines={1}>
-                                            {[item.properties.city, item.properties.state, item.properties.country].filter(Boolean).join(', ')}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    )}
+                                    {source.length > 0 && (
+                                        <TouchableOpacity onPress={() => searchPlaces('', 'source')} style={styles.clearBtnInside}>
+                                            <Ionicons name="close-circle" size={16} color="#CCC" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
 
-                    <View style={styles.dateTimeRow}>
-                        <TouchableOpacity
-                            style={styles.selectionCard}
-                            onPress={() => setShowDatePicker(true)}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.selectionLabel}>DATE</Text>
-                            <View style={styles.selectionValueRow}>
-                                <Ionicons name="calendar-outline" size={20} color="#000" />
-                                <Text style={styles.selectionValueText}>
-                                    {selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.outsideLabel}>To</Text>
+                                <View style={styles.inputPill}>
+                                    <Ionicons name="map" size={18} color="#000" style={styles.inputIcon} />
+                                    <View style={styles.inputTextWrapper}>
+                                        <TextInput
+                                            style={styles.locationInput}
+                                            value={destination}
+                                            placeholder="Enter destination"
+                                            placeholderTextColor="#999"
+                                            onChangeText={(text) => searchPlaces(text, 'destination')}
+                                            onFocus={() => setActiveField('destination')}
+                                            onBlur={() => setActiveField(null)}
+                                        />
+                                    </View>
+                                    {destination.length > 0 && (
+                                        <TouchableOpacity onPress={() => searchPlaces('', 'destination')} style={styles.clearBtnInside}>
+                                            <Ionicons name="close-circle" size={16} color="#CCC" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+
+                            <TouchableOpacity onPress={handleSwap} style={styles.swapBtnBlackCompact} activeOpacity={0.8}>
+                                <Ionicons name="swap-vertical" size={17} color="#FFF" />
+                            </TouchableOpacity>
+                        </Animated.View>
+
+                        {activeField && suggestions.length > 0 && (
+                            <View style={styles.suggestionsWrapper}>
+                                {suggestions.map((item, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={styles.suggestionItem}
+                                        onPress={() => handleSelectSuggestion(item)}
+                                    >
+                                        <View style={styles.locIconBg}>
+                                            <Ionicons name="location" size={16} color="#666" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.suggestionTitle} numberOfLines={1}>
+                                                {item.properties.name || item.properties.city || item.properties.street}
+                                            </Text>
+                                            <Text style={styles.suggestionSubtitle} numberOfLines={1}>
+                                                {[item.properties.city, item.properties.state, item.properties.country].filter(Boolean).join(', ')}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+
+                        <View style={styles.dateTimeRow}>
+                            <TouchableOpacity
+                                style={styles.selectionPill}
+                                onPress={() => setShowDatePicker(true)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.selectionLabelInside}>Departure</Text>
+                                <Text style={styles.selectionValueTextInside}>
+                                    {selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 </Text>
-                            </View>
-                        </TouchableOpacity>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={styles.selectionCard}
-                            onPress={() => setShowTimePicker(true)}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.selectionLabel}>TIME</Text>
-                            <View style={styles.selectionValueRow}>
-                                <Ionicons name="time-outline" size={20} color="#000" />
-                                <Text style={styles.selectionValueText}>
+                            <TouchableOpacity
+                                style={styles.selectionPill}
+                                onPress={() => setShowTimePicker(true)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.selectionLabelInside}>Time</Text>
+                                <Text style={styles.selectionValueTextInside}>
                                     {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </Text>
-                            </View>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            style={[styles.findBtnBottom, { marginTop: 20 }, !isFormValid && styles.findButtonDisabled]}
+                            onPress={handleFind}
+                            disabled={!isFormValid}
+                        >
+                            <Text style={[styles.findBtnTextNew, !isFormValid && styles.findButtonTextDisabled]}>Find My Trip</Text>
+                            <Ionicons name="arrow-forward" size={20} color={isFormValid ? "#FFF" : "#AAA"} style={{ marginLeft: 8 }} />
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        style={[styles.findBtnBottom, { marginTop: 25 }, !isFormValid && styles.findButtonDisabled]}
-                        onPress={handleFind}
-                        disabled={!isFormValid}
-                    >
-                        <Text style={[styles.findBtnTextNew, !isFormValid && styles.findButtonTextDisabled]}>Find My Trip</Text>
-                        <Ionicons name="arrow-forward" size={22} color={isFormValid ? "#FFF" : "#AAA"} style={{ marginLeft: 10 }} />
-                    </TouchableOpacity>
-                </ScrollView>
+                    {/* Upcoming Trips Section */}
+                    <View style={styles.upcomingSection}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Upcoming Trips</Text>
+                            <TouchableOpacity style={styles.seeAllBtn}>
+                                <Text style={styles.seeAllText}>See All</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.stackedContainer} {...panResponder.panHandlers}>
+                            {trips.map((_, index) => {
+                                const actualIndex = (index + stackIndex) % trips.length;
+                                const item = trips[actualIndex];
+                                const isTop = index === 0;
+
+                                // Visible cards (only top 3 for stacking effect)
+                                if (index > 2) return null;
+
+                                const scale = 1 - (index * 0.05);
+                                const translateY = index * 12;
+                                const opacity = 1 - (index * 0.3);
+
+                                return (
+                                    <Animated.View
+                                        key={item.id}
+                                        style={[
+                                            styles.upcomingCard,
+                                            styles.stackedCard,
+                                            {
+                                                zIndex: trips.length - index,
+                                                opacity,
+                                                transform: [
+                                                    { scale },
+                                                    { translateY: isTop ? Animated.add(translateY, swipeAnim) : translateY }
+                                                ],
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                            }
+                                        ]}
+                                    >
+                                        <View style={styles.cardHeader}>
+                                            <Text style={styles.operatorText}>{item.operator}</Text>
+                                            <Text style={styles.priceText}>{item.time}</Text>
+                                        </View>
+
+                                        <View style={styles.notificationMain}>
+                                            <View style={styles.avatarCircle}>
+                                                <Ionicons name={item.icon as any} size={20} color="#666" />
+                                            </View>
+                                            <View style={styles.notificationTextContent}>
+                                                <Text style={styles.senderName}>{item.user}</Text>
+                                                <Text style={styles.messageText} numberOfLines={2}>
+                                                    {item.message}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {isTop && (
+                                            <Text style={styles.moreNotifications}>
+                                                {trips.length - 1} more notifications
+                                            </Text>
+                                        )}
+                                    </Animated.View>
+                                );
+                            })}
+                        </View>
+                    </View>
+                </View>
             </View >
+
 
 
 
@@ -413,142 +469,157 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FAFAF8',
     },
-    headerBg: {
-        height: 320,
-        width: '100%',
-        justifyContent: 'flex-start',
-        backgroundColor: '#FFFFFF', // Match illustration background
-    },
-    gradientOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-    },
-    headerImage: {
-        opacity: 1,
-        marginTop: 20, // Add some space for the back button and title
+
+    backBtnCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F0',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 10 : 20,
+        paddingTop: Platform.OS === 'ios' ? 10 : 25,
     },
-    circleBackButton: {
-        width: 45,
-        height: 45,
-        borderRadius: 22.5,
-        backgroundColor: '#FFF',
+    notificationBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F0',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
     },
-    pageTitleHeader: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#1A1D1D',
-        fontFamily: Platform.OS === 'ios' ? 'Avenir' : 'serif',
-    },
-    content: {
-        flex: 1,
-        marginTop: -60, // Increased from -30 to move it upward
-    },
-    scrollContent: {
+    compactHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingBottom: 40, // Reduced as button is now inside
+        marginBottom: 20,
     },
-    routeCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 25, // Slightly smaller radius for compact look
-        padding: 15, // Reduced from 20
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.05,
-        shadowRadius: 20,
-        elevation: 5,
-        width: '100%',
-    },
-    inputGroup: {
-        marginBottom: 12,
-    },
-    inputLabel: {
-        fontSize: 10,
+    compactHeaderTitle: {
+        fontSize: 18,
         fontWeight: '700',
-        color: '#999', // Neutral grey
-        marginBottom: 4,
-        marginLeft: 5,
-        letterSpacing: 0.5,
+        color: '#000',
+    },
+
+    contentView: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
+    mainFormContainer: {
+        backgroundColor: '#FFF',
+        borderRadius: 35,
+        padding: 18,
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 15 },
+        shadowOpacity: 0.08,
+        shadowRadius: 25,
+        elevation: 12,
+    },
+
+    routeSection: {
+        width: '100%',
     },
     inputPill: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        height: 48, // Reduced from 58
-        borderWidth: 1,
-        borderColor: '#E8EDED',
+        borderRadius: 16,
+        paddingHorizontal: 15,
+        height: 48, // Reduced from 55
+        marginBottom: 2,
+        borderWidth: 1.5,
+        borderColor: '#E8EBF5',
     },
-    inputIcon: {
-        marginRight: 12,
-    },
-    locationInput: {
+    inputTextWrapper: {
         flex: 1,
-        fontSize: 16,
-        color: '#1A1D1D',
+        marginLeft: 10,
+        height: '100%',
+    },
+    inputLabelInside: {
+        position: 'absolute',
+        left: 0,
+        color: '#999',
         fontWeight: '600',
     },
-    clearBtn: {
-        padding: 5,
+    inputIcon: {
+        width: 20,
     },
-    swapBtnBlack: {
+    locationInput: {
+        fontSize: 15,
+        color: '#000',
+        fontWeight: '500',
+        padding: 0,
+        height: '100%',
+    },
+    inputWrapper: {
+        marginBottom: 4,
+    },
+    outsideLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#666',
+        marginBottom: 2,
+        marginLeft: 4,
+    },
+    clearBtnInside: {
+        padding: 4,
+    },
+    swapBtnBlackCompact: {
         position: 'absolute',
-        right: 15,
-        top: '46%',
-        backgroundColor: '#000', // Changed from teal to black
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        right: 20,
+        top: 80,
+        marginTop: -16,
+        backgroundColor: '#000',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#FFF',
+        zIndex: 10,
+        elevation: 4,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 8,
-        zIndex: 100,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     dateTimeRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 20,
+        marginTop: 5,
     },
-    selectionCard: {
+    selectionPill: {
         backgroundColor: '#FFF',
-        borderRadius: 25,
-        padding: 20,
-        width: '48%',
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.03,
-        shadowRadius: 10,
-        elevation: 2,
+        borderRadius: 18,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        width: '48.5%',
+        borderWidth: 1.5,
+        borderColor: '#E8EBF5',
+    },
+    selectionLabelInside: {
+        fontSize: 11,
+        color: '#999',
+        fontWeight: '500',
+        marginBottom: 2,
+    },
+    selectionValueTextInside: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#000',
     },
     selectionLabel: {
-        fontSize: 11,
+        fontSize: 10, // Reduced from 11
         fontWeight: '700',
-        color: '#999', // Neutral grey
-        marginBottom: 12,
+        color: '#999',
+        marginBottom: 6, // Reduced from 12
         letterSpacing: 0.5,
     },
     selectionValueRow: {
@@ -556,24 +627,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     selectionValueText: {
-        fontSize: 15,
+        fontSize: 14, // Reduced from 15
         fontWeight: '700',
         color: '#1A1D1D',
         marginLeft: 8,
     },
 
     findBtnBottom: {
-        backgroundColor: '#000', // Changed from teal to black
-        height: 65,
-        borderRadius: 25,
+        backgroundColor: '#000',
+        height: 52,
+        borderRadius: 18,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 15,
-        elevation: 10,
+        marginTop: 12, // Reduced
+        width: '100%',
     },
     findBtnTextNew: {
         color: '#FFF',
@@ -621,11 +689,144 @@ const styles = StyleSheet.create({
     },
     suggestionTitle: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#1A1D1D',
     },
     suggestionSubtitle: {
         fontSize: 13,
         color: '#999',
+    },
+    upcomingSection: {
+        marginTop: 20, // Reduced
+        width: '100%',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+        paddingHorizontal: 5,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1D1D',
+    },
+    seeAllBtn: {
+        backgroundColor: '#000',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    seeAllText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    upcomingCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 25,
+        padding: 18,
+        height: 140, // Consistent height for stack
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    stackedContainer: {
+        height: 180,
+        marginTop: 10,
+        paddingHorizontal: 0,
+    },
+    stackedCard: {
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+    },
+    notificationMain: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 5,
+    },
+    avatarCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F5F5F5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    notificationTextContent: {
+        flex: 1,
+    },
+    senderName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#000',
+        marginBottom: 2,
+    },
+    messageText: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 18,
+    },
+    moreNotifications: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 10,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    operatorText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#999',
+        letterSpacing: 1,
+    },
+    priceText: {
+        fontSize: 11,
+        color: '#999',
+    },
+    routeContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    cityBlock: {
+        flex: 1,
+    },
+    cityLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1A1D1D',
+    },
+    timeLabel: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+    },
+    pathIconContainer: {
+        flex: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    busIconPath: {
+        position: 'absolute',
+        top: -15,
+        backgroundColor: '#FFF',
+        paddingHorizontal: 5,
+    },
+    dashedLine: {
+        height: 1,
+        width: '80%',
+        borderWidth: 1,
+        borderColor: '#EEE',
+        borderStyle: 'dashed',
+        borderRadius: 1,
     },
 });

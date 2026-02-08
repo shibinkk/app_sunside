@@ -22,7 +22,7 @@ export default function VerifyScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { showToast } = useToast();
-    const { signIn } = useAuth();
+    const { user } = useAuth();
     const { height: screenHeight } = useWindowDimensions();
 
 
@@ -87,9 +87,18 @@ export default function VerifyScreen() {
             const data = await response.json();
 
             if (response.ok) {
-                await signIn(data.token, data.user);
-                showToast('Registration successful!', 'success');
-                router.replace('/(tabs)');
+                // OTP verified by backend, now create user in Firebase
+                try {
+                    const { signUp: firebaseSignUp } = require('../../config/authHelper');
+                    // We need to pass the password from params
+                    await firebaseSignUp(params.email as string, params.password as string, params.name as string);
+
+                    showToast('Registration successful!', 'success');
+                    router.replace('/(tabs)');
+                } catch (firebaseError: any) {
+                    console.error('Firebase Registration Error:', firebaseError);
+                    showToast(firebaseError.message || 'Error creating Firebase account', 'error');
+                }
             } else {
                 showToast(data.message || 'Verification failed', 'error');
             }
