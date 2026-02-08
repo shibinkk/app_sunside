@@ -74,20 +74,36 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
-      const { signUp: firebaseSignUp } = require('../../config/authHelper');
-      // This creates the user in Firebase and sends a verification email automatically if enabled
-      await firebaseSignUp(email, password, fullName);
+      const response = await fetch(`${API_URL}/auth/send-register-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          name: fullName
+        }),
+      });
 
-      showToast('Registration successful! Please check your email to verify your account.', 'success');
-      router.replace('/(auth)/login');
-    } catch (error: any) {
-      console.error('Registration Error:', error);
-      let message = 'An error occurred during registration';
-      if (error.code === 'auth/email-already-in-use') message = 'This email is already registered';
-      if (error.code === 'auth/invalid-email') message = 'Invalid email address';
-      if (error.code === 'auth/weak-password') message = 'Password is too weak';
+      const data = await response.json();
 
-      showToast(message, 'error');
+      if (response.ok) {
+        showToast('OTP sent to your email!', 'success');
+        router.push({
+          pathname: '/(auth)/verify',
+          params: {
+            name: fullName,
+            email: email,
+            password: password,
+            phoneNumber: `${callingCode}${phone}`,
+          }
+        });
+      } else {
+        showToast(data.message || 'An error occurred', 'error');
+      }
+    } catch (error) {
+      console.error('OTP Send Error:', error);
+      showToast('Could not connect to the server', 'error');
     } finally {
       setIsLoading(false);
     }

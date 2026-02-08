@@ -51,14 +51,7 @@ export default function LoginScreen() {
 
     try {
       const { signIn: firebaseSignIn } = require('../../config/authHelper');
-      const user = await firebaseSignIn(email, password);
-
-      if (!user.emailVerified) {
-        const { auth } = require('../../config/firebase');
-        await auth.signOut();
-        showToast('Please verify your email before logging in.', 'error');
-        return;
-      }
+      await firebaseSignIn(email, password);
 
       showToast('Login successful!', 'success');
       router.replace('/(tabs)');
@@ -283,7 +276,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     color: '#666',
     fontSize: 13,
-    marginTop: 5,
+    marginTop: 4,
   },
   buttonContainer: {
     marginTop: 'auto',

@@ -30,7 +30,6 @@ export const signUp = async (email: string, password: string, name: string, extr
             ...extraData
         });
 
-        await sendEmailVerification(user);
         return user;
     } catch (error) {
         throw error;
