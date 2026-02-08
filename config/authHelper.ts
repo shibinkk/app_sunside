@@ -9,14 +9,29 @@ import {
     signInWithCredential,
     OAuthProvider
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { setDoc, doc } from 'firebase/firestore';
 
-export const signUp = async (email: string, password: string, name: string) => {
+export const signUp = async (email: string, password: string, name: string, extraData?: any) => {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, { displayName: name });
-        await sendEmailVerification(userCredential.user);
-        return userCredential.user;
+        const user = userCredential.user;
+
+        // Update Firebase Auth profile
+        await updateProfile(user, { displayName: name });
+
+        // Save extra data (like phone number) to Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+            uid: user.uid,
+            name,
+            email,
+            phoneNumber: extraData?.phoneNumber || '',
+            createdAt: new Date().toISOString(),
+            ...extraData
+        });
+
+        await sendEmailVerification(user);
+        return user;
     } catch (error) {
         throw error;
     }
@@ -26,9 +41,9 @@ export const signInWithSocial = async (providerName: 'google' | 'facebook' | 'ap
     try {
         let credential;
         if (providerName === 'google') {
-            credential = GoogleAuthProvider.credential(idToken);
+            credential = GoogleAuthProvider.credential(idToken || '');
         } else if (providerName === 'facebook') {
-            credential = FacebookAuthProvider.credential(accessToken);
+            credential = FacebookAuthProvider.credential(accessToken || '');
         } else if (providerName === 'apple') {
             const provider = new OAuthProvider('apple.com');
             credential = provider.credential({

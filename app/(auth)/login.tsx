@@ -93,7 +93,7 @@ export default function LoginScreen() {
         <View
           style={[
             styles.logoContainer,
-            { marginBottom: responsiveMargin, marginTop: screenHeight < 700 ? -20 : 0 },
+            { marginBottom: 15, marginTop: screenHeight < 700 ? -35 : -20 },
           ]}
         >
           <Image
@@ -107,7 +107,7 @@ export default function LoginScreen() {
         </View>
 
         {/* HEADER */}
-        <View style={[styles.headerContainer, { marginBottom: headerMargin }]}>
+        <View style={[styles.headerContainer, { marginBottom: 35 }]}>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>sign in to access your account</Text>
         </View>
@@ -192,14 +192,17 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-google" size={24} color="#DB4437" />
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => {/* Google login logic placeholder */ }}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-facebook" size={24} color="#4267B2" />
+              <Ionicons name="logo-facebook" size={20} color="#1877F2" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={24} color="#000000" />
+              <Ionicons name="logo-apple" size={20} color="#000000" />
             </TouchableOpacity>
           </View>
 
@@ -219,7 +222,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 40, // Reduced from 60
     paddingBottom: 60,
   },
   logoContainer: {
@@ -229,13 +232,13 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   headerContainer: {
-    marginBottom: 40,
+    marginBottom: 35,
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
@@ -250,7 +253,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     height: 56,
     borderWidth: 1,
     borderColor: '#F0F0F0',
@@ -280,7 +283,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     color: '#666',
     fontSize: 13,
-    marginTop: 8,
+    marginTop: 5,
   },
   buttonContainer: {
     marginTop: 'auto',
@@ -317,7 +320,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 8, // Reduced from 30
   },
   dividerLine: {
     flex: 1,
@@ -332,22 +335,22 @@ const styles = StyleSheet.create({
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginBottom: 40,
+    gap: 15,
+    marginBottom: 10, // Reduced from 40
   },
   socialButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 48, // Reduced from 60
+    height: 48, // Reduced from 60
+    borderRadius: 24,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    elevation: 2,
+    borderColor: '#F5F5F5',
+    elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
 });

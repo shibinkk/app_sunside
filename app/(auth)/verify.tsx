@@ -91,7 +91,12 @@ export default function VerifyScreen() {
                 try {
                     const { signUp: firebaseSignUp } = require('../../config/authHelper');
                     // We need to pass the password from params
-                    await firebaseSignUp(params.email as string, params.password as string, params.name as string);
+                    await firebaseSignUp(
+                        params.email as string,
+                        params.password as string,
+                        params.name as string,
+                        { phoneNumber: params.phoneNumber as string }
+                    );
 
                     showToast('Registration successful!', 'success');
                     router.replace('/(tabs)');
